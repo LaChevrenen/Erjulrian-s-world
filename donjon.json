@@ -1,0 +1,22 @@
+{
+    "_id": "id of the donjon run",
+    "heroId": "id of the hero",
+    "startedAt": "original start date of the donjon run",
+    "finishedAt": "date of completion of the donjon run",
+    "status": "current status of the donjon run",
+
+    "position":
+    {
+        "floor": "current floor number",
+        "room": "current room number"
+    },
+
+    "rooms": [
+        {
+            "floor": "floor number",
+            "room": "room number",
+            "type": "type of the room (combat, treasure, trap, etc.)",
+            "monsterId": "id of the monster encountered (if any)"
+        }
+    ]     
+}

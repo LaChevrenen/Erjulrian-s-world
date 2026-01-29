@@ -1,0 +1,21 @@
+{
+    "_id": "unique identifier for the monster",
+    "name": "name of the monster",
+    "type": "type or category of the monster (e.g., goblin, dragon)",
+    "description": "brief description of the monster",
+    "stats": 
+    {
+        "hp": "hit points of the monster",
+        "att": "attack value of the monster",
+        "def": "defense value of the monster",
+        "regen": "regeneration rate of the monster"
+    },
+
+    "lootTable": [
+        {
+            "itemId": "Id of the item dropped by the monster",
+            "chance": "Probability (in percentage) of the item being dropped",
+            "amount": "Quantity of the item dropped"
+        }
+    ]
+}

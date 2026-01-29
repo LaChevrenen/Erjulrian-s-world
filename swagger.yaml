@@ -723,8 +723,15 @@ components:
           type: string
         monsterId:
           type: string
-        visited:
-          type: boolean
+
+    RoomChoice:
+      type: object
+      properties:
+        roomIndex:
+          type: integer
+          description: Index of the room in the dungeon
+        type:
+          type: string
 
     RoomChoices:
       type: object
@@ -732,7 +739,7 @@ components:
         choices:
           type: array
           items:
-            $ref: '#/components/schemas/DungeonRoom'
+            $ref: '#/components/schemas/RoomChoice'
           minItems: 0
           maxItems: 2
 

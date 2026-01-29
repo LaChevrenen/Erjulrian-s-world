@@ -1,0 +1,16 @@
+services:
+  combat-service:
+    build: .
+    container_name: combat-api
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+    networks:
+      - erjulrian-network
+    restart: always
+
+networks:
+  erjulrian-network:
+    driver: bridge

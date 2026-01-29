@@ -1,0 +1,143 @@
+openapi: 3.0.3
+info:
+  title: Artifact Service API
+  description: Artifact management
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3007/api
+
+tags:
+  - name: Artifacts
+
+paths:
+
+  /artifacts:
+    get:
+      tags: [Artifacts]
+      summary: List artifacts
+      responses:
+        200:
+          description: Artifacts list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Artifact'
+    post:
+      tags: [Artifacts]
+      summary: Create an artifact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateArtifactRequest'
+      responses:
+        201:
+          description: Artifact created
+
+  /artifacts/{artifactId}:
+    get:
+      tags: [Artifacts]
+      summary: Get artifact details
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        200:
+          description: Artifact
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artifact'
+    put:
+      tags: [Artifacts]
+      summary: Update artifact
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateArtifactRequest'
+      responses:
+        200:
+          description: Artifact updated
+    delete:
+      tags: [Artifacts]
+      summary: Delete artifact
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        204:
+          description: Artifact deleted
+
+components:
+
+  parameters:
+    ArtifactId:
+      name: artifactId
+      in: path
+      required: true
+      schema:
+        type: integer
+
+  schemas:
+
+    Artifact:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        level:
+          type: integer
+        hpBuff:
+          type: integer
+        attBuff:
+          type: integer
+        defBuff:
+          type: integer
+        regenBuff:
+          type: integer
+        description:
+          type: string
+
+    CreateArtifactRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        level:
+          type: integer
+        hpBuff:
+          type: integer
+        attBuff:
+          type: integer
+        defBuff:
+          type: integer
+        regenBuff:
+          type: integer
+        description:
+          type: string
+
+    UpdateArtifactRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        level:
+          type: integer
+        hpBuff:
+          type: integer
+        attBuff:
+          type: integer
+        defBuff:
+          type: integer
+        regenBuff:
+          type: integer
+        description:
+          type: string

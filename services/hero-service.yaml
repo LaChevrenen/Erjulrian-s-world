@@ -1,0 +1,140 @@
+openapi: 3.0.3
+info:
+  title: Hero Service API
+  description: Hero management and stats
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3003/api
+
+tags:
+  - name: Heroes
+
+paths:
+
+  /heroes:
+    post:
+      tags: [Heroes]
+      summary: Create a hero
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHeroRequest'
+      responses:
+        201:
+          description: Hero created
+
+  /heroes/{heroId}:
+    get:
+      tags: [Heroes]
+      summary: Get hero info
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      responses:
+        200:
+          description: Hero stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeroStats'
+    put:
+      tags: [Heroes]
+      summary: Update hero info
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateHeroRequest'
+      responses:
+        200:
+          description: Hero updated
+    delete:
+      tags: [Heroes]
+      summary: Delete a hero
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      responses:
+        204:
+          description: Hero deleted
+
+  /heroes/{heroId}/xp:
+    post:
+      tags: [Heroes]
+      summary: Add XP to hero
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddXpRequest'
+      responses:
+        200:
+          description: XP added
+
+components:
+
+  parameters:
+    HeroId:
+      name: heroId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+
+    CreateHeroRequest:
+      type: object
+      properties:
+        name:
+          type: string
+
+    UpdateHeroRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        level:
+          type: integer
+        xp:
+          type: integer
+        stats:
+          $ref: '#/components/schemas/Stats'
+
+    HeroStats:
+      type: object
+      properties:
+        heroId:
+          type: string
+        level:
+          type: integer
+        xp:
+          type: integer
+        stats:
+          $ref: '#/components/schemas/Stats'
+
+    AddXpRequest:
+      type: object
+      properties:
+        xp:
+          type: integer
+
+    Stats:
+      type: object
+      properties:
+        hp:
+          type: integer
+        att:
+          type: integer
+        def:
+          type: integer
+        regen:
+          type: integer

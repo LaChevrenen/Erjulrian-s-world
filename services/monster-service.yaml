@@ -1,0 +1,79 @@
+openapi: 3.0.3
+info:
+  title: Monster Service API
+  description: Monster catalog
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3008/api
+
+tags:
+  - name: Monsters
+
+paths:
+
+  /monsters:
+    get:
+      tags: [Monsters]
+      summary: List monsters
+      responses:
+        200:
+          description: Monsters list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Monster'
+
+  /monsters/{monsterId}:
+    get:
+      tags: [Monsters]
+      summary: Get monster details
+      parameters:
+        - name: monsterId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Monster
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Monster'
+
+components:
+
+  schemas:
+
+    Monster:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        description:
+          type: string
+        stats:
+          $ref: '#/components/schemas/Stats'
+        lootTable:
+          type: array
+          items:
+            type: object
+
+    Stats:
+      type: object
+      properties:
+        hp:
+          type: integer
+        att:
+          type: integer
+        def:
+          type: integer
+        regen:
+          type: integer

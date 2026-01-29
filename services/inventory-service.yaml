@@ -1,0 +1,120 @@
+openapi: 3.0.3
+info:
+  title: Inventory Service API
+  description: Inventory and items management
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3004/api
+
+tags:
+  - name: Inventory
+
+paths:
+
+  /inventory:
+    post:
+      tags: [Inventory]
+      summary: Create inventory for hero
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInventoryRequest'
+      responses:
+        201:
+          description: Inventory created
+
+  /inventory/{heroId}:
+    get:
+      tags: [Inventory]
+      summary: Get hero inventory
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      responses:
+        200:
+          description: Inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+    put:
+      tags: [Inventory]
+      summary: Update entire hero inventory
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInventoryRequest'
+      responses:
+        200:
+          description: Inventory updated
+    delete:
+      tags: [Inventory]
+      summary: Delete hero inventory
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      responses:
+        204:
+          description: Inventory deleted
+
+components:
+
+  parameters:
+    HeroId:
+      name: heroId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+
+    Inventory:
+      type: object
+      properties:
+        gold:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryItem'
+
+    InventoryItem:
+      type: object
+      properties:
+        artifactId:
+          type: integer
+        quantity:
+          type: integer
+        equipped:
+          type: boolean
+
+    CreateInventoryRequest:
+      type: object
+      properties:
+        heroId:
+          type: string
+        gold:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryItem'
+
+    UpdateInventoryRequest:
+      type: object
+      properties:
+        heroId:
+          type: string
+        gold:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryItem'

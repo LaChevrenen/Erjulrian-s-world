@@ -161,26 +161,24 @@ paths:
         204:
           description: Hero deleted
 
-  /heroes/{heroId}/xp:
+
+  #######################
+  # INVENTORY SERVICE
+  #######################
+  /inventory:
     post:
-      tags: [Heroes]
-      summary: Add XP to hero
-      parameters:
-        - $ref: '#/components/parameters/HeroId'
+      tags: [Inventory]
+      summary: Create inventory for hero
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AddXpRequest'
+              $ref: '#/components/schemas/CreateInventoryRequest'
       responses:
-        200:
-          description: XP added
-          
+        201:
+          description: Inventory created
 
-  #######################
-  # INVENTORY SERVICE
-  #######################
   /inventory/{heroId}:
     get:
       tags: [Inventory]

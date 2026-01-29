@@ -48,6 +48,18 @@ components:
 
   schemas:
 
+    LootItem:
+      type: object
+      properties:
+        artifactId:
+          type: integer
+        chance:
+          type: number
+          description: Probability in percentage (0-100)
+        amount:
+          type: integer
+          description: Quantity of the item dropped
+
     Monster:
       type: object
       properties:
@@ -64,7 +76,7 @@ components:
         lootTable:
           type: array
           items:
-            type: object
+            $ref: '#/components/schemas/LootItem'
 
     Stats:
       type: object

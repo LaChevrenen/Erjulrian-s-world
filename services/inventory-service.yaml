@@ -100,13 +100,7 @@ components:
       properties:
         heroId:
           type: string
-        gold:
-          type: integer
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/InventoryItem'
-
+          
     UpdateInventoryRequest:
       type: object
       properties:

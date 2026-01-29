@@ -181,32 +181,6 @@ paths:
   #######################
   # INVENTORY SERVICE
   #######################
-  /inventory:
-    post:
-      tags: [Inventory]
-      summary: Create inventory for hero
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateInventoryRequest'
-      responses:
-        201:
-          description: Inventory created
-    put:
-      tags: [Inventory]
-      summary: Update inventory
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateInventoryRequest'
-      responses:
-        200:
-          description: Inventory updated
-
   /inventory/{heroId}:
     get:
       tags: [Inventory]
@@ -220,6 +194,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Inventory'
+    put:
+      tags: [Inventory]
+      summary: Update entire hero inventory
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInventoryRequest'
+      responses:
+        200:
+          description: Inventory updated
     delete:
       tags: [Inventory]
       summary: Delete hero inventory
@@ -228,48 +216,6 @@ paths:
       responses:
         204:
           description: Inventory deleted
-
-  /inventory/{heroId}/items:
-    post:
-      tags: [Inventory]
-      summary: Add item to inventory
-      parameters:
-        - $ref: '#/components/parameters/HeroId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InventoryItemUpsertRequest'
-      responses:
-        200:
-          description: Item added
-
-  /inventory/{heroId}/items/{artifactId}:
-    put:
-      tags: [Inventory]
-      summary: Update inventory item
-      parameters:
-        - $ref: '#/components/parameters/HeroId'
-        - $ref: '#/components/parameters/ArtifactId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InventoryItemUpsertRequest'
-      responses:
-        200:
-          description: Item updated
-    delete:
-      tags: [Inventory]
-      summary: Remove item from inventory
-      parameters:
-        - $ref: '#/components/parameters/HeroId'
-        - $ref: '#/components/parameters/ArtifactId'
-      responses:
-        204:
-          description: Item removed
 
   #######################
   # DUNGEON SERVICE

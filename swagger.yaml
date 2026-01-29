@@ -252,10 +252,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/DungeonRun'
 
-  /dungeons/{runId}/move:
+  /dungeons/{runId}/choices:
+    get:
+      tags: [Dungeons]
+      summary: Get available room choices
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        200:
+          description: Available room choices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomChoices'
+
+  /dungeons/{runId}/choose:
     post:
       tags: [Dungeons]
-      summary: Move in dungeon by room number
+      summary: Choose next room from available options
       parameters:
         - $ref: '#/components/parameters/RunId'
       requestBody:
@@ -263,20 +277,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MoveByRoomRequest'
+              $ref: '#/components/schemas/ChooseRoomRequest'
       responses:
         200:
-          description: Position updated
-
-  /dungeons/{runId}/enter:
-    post:
-      tags: [Dungeons]
-      summary: Enter a room
-      parameters:
-        - $ref: '#/components/parameters/RunId'
-      responses:
-        200:
-          description: Room entered
+          description: Room chosen and entered
 
   /dungeons/{runId}/finish:
     post:
@@ -722,18 +726,23 @@ components:
         visited:
           type: boolean
 
-    MoveRequest:
+    RoomChoices:
       type: object
       properties:
-        direction:
-          type: string
-          enum: [forward, backward, left, right]
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/DungeonRoom'
+          minItems: 0
+          maxItems: 2
 
-    MoveByRoomRequest:
+    ChooseRoomRequest:
       type: object
       properties:
-        room:
+        choiceIndex:
           type: integer
+          description: Index of the chosen room (0 or 1)
+          enum: [0, 1]
 
     CombatRequest:
       type: object

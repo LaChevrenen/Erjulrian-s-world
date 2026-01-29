@@ -105,4 +105,4 @@ components:
         lootTable:
           type: array
           items:
-            type: object
+            $ref: '#/components/schemas/LootItem'

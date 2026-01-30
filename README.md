@@ -12,13 +12,13 @@ There is x different rooms (combat, elite-combat, bonus, debuff, boss).
 Dungeon can change your base states during the dungeons and you can find artefact to boost temporally stats.
 
 ## Services
-- API Gateway
-- User Service (PostgreSQL)
-- Hero Service (PostgreSQL)
-- Inventory Service (PostgreSQL)
-- Dungeon Service (MongoDB + Redis)
-- Combat Service (stateless)
-- Log Service (Elasticsearch)
+- API Gateway				: 3000
+- User Service (PostgreSQL)		: 3001
+- Hero Service (PostgreSQL)		: 3002
+- Inventory Service (PostgreSQL)	: 3003
+- Dungeon Service (MongoDB + Redis)	: 3004
+- Combat Service (stateless)		: 3005
+- Log Service (Elasticsearch)		: 3006
 
 ## Data
 - SQL models in models/

@@ -1,7 +1,7 @@
 {
-  "name": "hero-service",
+  "name": "inventory-service",
   "version": "1.0.0",
-  "description": "Service de gestion des héros pour Erjulrian's World",
+  "description": "Service de gestion des inventaires pour Erjulrian's World",
   "main": "server.js",
   "dependencies": {
     "amqplib": "^0.10.9",

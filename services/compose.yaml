@@ -50,6 +50,27 @@ services:
     networks:
       - erjulrian-network
     restart: always
+
+  inventory-service:
+    build: ./inventory
+    container_name: inventory-api
+    depends_on:
+      - db
+      - rabbitmq
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=inventory_user
+      - DB_PASSWORD=inventory_password
+      - DB_NAME=erjulrian_db
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    networks:
+      - erjulrian-network
+    restart: always
   
   rabbitmq:
     image: rabbitmq:3-management

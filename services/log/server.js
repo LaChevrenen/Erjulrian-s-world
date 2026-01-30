@@ -3,8 +3,10 @@ const { Client } = require('@elastic/elasticsearch');
 const amqp = require('amqplib');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
+const cors = require('cors');
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3009;

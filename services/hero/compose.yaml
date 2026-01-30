@@ -1,0 +1,25 @@
+services:
+  hero-service:
+    build: .
+    container_name: hero-api
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=hero_user
+      - DB_PASSWORD=hero_password
+      - DB_NAME=erjulrian
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    networks:
+      - erjulrian-network
+    restart: always
+    depends_on:
+      - postgres
+      - rabbitmq
+
+networks:
+  erjulrian-network:
+    driver: bridge

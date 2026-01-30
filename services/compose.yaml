@@ -29,6 +29,27 @@ services:
     networks:
       - erjulrian-network
     restart: always
+
+  hero-service:
+    build: ./hero
+    container_name: hero-api
+    depends_on:
+      - db
+      - rabbitmq
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=hero_user
+      - DB_PASSWORD=hero_password
+      - DB_NAME=erjulrian_db
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    networks:
+      - erjulrian-network
+    restart: always
   
   rabbitmq:
     image: rabbitmq:3-management

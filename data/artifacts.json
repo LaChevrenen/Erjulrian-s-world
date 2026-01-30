@@ -1,0 +1,412 @@
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440501",
+    "name": "Pique-nique du Gobelin",
+    "level": 1,
+    "hp_buff": 0,
+    "att_buff": 2,
+    "def_buff": 0,
+    "regen_buff": 0,
+    "description": "Une fourchette rouillée retrouvée dans un fossé. Etrangement tranchante. Les gobelins adorent."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440502",
+    "name": "Veste de Grand-mère",
+    "level": 1,
+    "hp_buff": 5,
+    "att_buff": 0,
+    "def_buff": 2,
+    "regen_buff": 0,
+    "description": "Une vieille veste tricotée à la main qui sent la lavande. Incroyablement confortable et protectrice."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440503",
+    "name": "Jus de Betteraves Magique",
+    "level": 1,
+    "hp_buff": 10,
+    "att_buff": 0,
+    "def_buff": 0,
+    "regen_buff": 0,
+    "description": "Un jus de betterave tant convoité qu'il est devenu magique. Guérit les petites blessures instantanément."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440504",
+    "name": "Baguette Magique du Boulanger",
+    "level": 2,
+    "hp_buff": 0,
+    "att_buff": 5,
+    "def_buff": 1,
+    "regen_buff": 0,
+    "description": "Une baguette fraîchement sortie du four qui reste chaude. Elle rend les coups durs et croustillants."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440505",
+    "name": "Anneau du Mariage Raté",
+    "level": 2,
+    "hp_buff": 0,
+    "att_buff": 1,
+    "def_buff": 0,
+    "regen_buff": 2,
+    "description": "Un anneau d'or d'un mariage qui n'a jamais eu lieu. Porte chance et régénère lentement celui qui le porte."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440506",
+    "name": "Casserole du Chef Fou",
+    "level": 3,
+    "hp_buff": 10,
+    "att_buff": 0,
+    "def_buff": 4,
+    "regen_buff": 0,
+    "description": "Une énorme casserole en cuivre qui porte les traces de 500 ans de cuisine violente. Parfait pour se défendre."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440507",
+    "name": "Zeste de Citron Ancien",
+    "level": 4,
+    "hp_buff": 0,
+    "att_buff": 10,
+    "def_buff": 2,
+    "regen_buff": 0,
+    "description": "Un zeste de citron pétrifié qui a 2000 ans. Quand vous attaquez, ça sent l'acide et ça fait VRAIMENT mal."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440508",
+    "name": "Recette Secrète du Chaosma",
+    "level": 3,
+    "hp_buff": 0,
+    "att_buff": 6,
+    "def_buff": 0,
+    "regen_buff": 1,
+    "description": "Une recette écrite sur du papyrus qui fait brûler les yeux. Les ingrédients sont trop secrets pour les lister."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440509",
+    "name": "Smoothie Énergétique Maudit",
+    "level": 2,
+    "hp_buff": 5,
+    "att_buff": 3,
+    "def_buff": 1,
+    "regen_buff": 1,
+    "description": "Un smoothie vert suspect qui sent le malheur. Vous n'êtes pas sûr de ce qu'il contient mais ça marche."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440510",
+    "name": "Médaille du Bizarre",
+    "level": 4,
+    "hp_buff": 20,
+    "att_buff": 0,
+    "def_buff": 3,
+    "regen_buff": 3,
+    "description": "Une médaille qui pend bizarrement et fait des bruits étranges. Elle vous rend quasi immortel. Personne sait pourquoi."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440511",
+    "name": "Couronne de l'Absurdité",
+    "level": 5,
+    "hp_buff": 30,
+    "att_buff": 5,
+    "def_buff": 5,
+    "regen_buff": 5,
+    "description": "Une couronne absolument ridicule qui ne devrait pas exister. Pourtant elle rend son porteur quasi indestructible et bizarrement puissant."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440512",
+    "name": "Filet à Crevette Louise",
+    "level": 4,
+    "hp_buff": 15,
+    "att_buff": 8,
+    "def_buff": 2,
+    "regen_buff": 0,
+    "description": "Un filet magique tressé par Louise elle-même. Sent la mayonnaise et le normand. Parfait pour capturer les ennemis."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440513",
+    "name": "Écaille de Dragon Rancunier",
+    "level": 4,
+    "hp_buff": 8,
+    "att_buff": 6,
+    "def_buff": 8,
+    "regen_buff": 1,
+    "description": "Une écaille du Lézard Pas Sympa. Elle est chaude et gronde comme lui. Excellente défense contre les coups bas."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440514",
+    "name": "Grimoire du Mage Myope",
+    "level": 3,
+    "hp_buff": 0,
+    "att_buff": 7,
+    "def_buff": 2,
+    "regen_buff": 2,
+    "description": "Un grimoire plein de sort aléatoires. Les pages sont écrites à l'envers parce qu'il n'a pas ses lunettes."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440515",
+    "name": "Relique Sainte du Prêtre Endormi",
+    "level": 3,
+    "hp_buff": 12,
+    "att_buff": 3,
+    "def_buff": 3,
+    "regen_buff": 3,
+    "description": "Une relique couverte de bave de prêtre. Elle pue le presbytère mais elle guérit lentement."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440516",
+    "name": "Hache d'Orc Affamé",
+    "level": 3,
+    "hp_buff": 5,
+    "att_buff": 9,
+    "def_buff": 1,
+    "regen_buff": 0,
+    "description": "Une hache massive qui a coupé des milliers de sandwichs ET d'ennemis. Elle sent le salami."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440517",
+    "name": "Soie Tricotée de la Reine Arachnée",
+    "level": 3,
+    "hp_buff": 10,
+    "att_buff": 2,
+    "def_buff": 6,
+    "regen_buff": 0,
+    "description": "Un fil de soie tricotée avec amour. Très résistant. Sent légèrement la toile d'araignée."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440518",
+    "name": "Armure du Chevalier Maladroit",
+    "level": 3,
+    "hp_buff": 15,
+    "att_buff": 1,
+    "def_buff": 8,
+    "regen_buff": 0,
+    "description": "Une armure cabossée par 10000 chutes. Elle fait du bruit en se déplaçant mais elle protège vraiment."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440519",
+    "name": "Rouage du Robot Erwannito",
+    "level": 4,
+    "hp_buff": 5,
+    "att_buff": 5,
+    "def_buff": 7,
+    "regen_buff": 2,
+    "description": "Un rouage futuriste qui clignote. Améliore ta défense et te rend légèrement robotique."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440520",
+    "name": "Corne Magique de Juju",
+    "level": 4,
+    "hp_buff": 25,
+    "att_buff": 3,
+    "def_buff": 4,
+    "regen_buff": 0,
+    "description": "Une corne de chèvre naine qui peut percer du béton. Dégénère lentement mais rend ultra robuste."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440521",
+    "name": "Cristal de Feu Follet",
+    "level": 2,
+    "hp_buff": 0,
+    "att_buff": 6,
+    "def_buff": 0,
+    "regen_buff": 3,
+    "description": "Un cristal flottant qui saute partout. Il se remplit de rage mais aussi de compassion."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440522",
+    "name": "Pièce d'Or du Marchand Voleur",
+    "level": 2,
+    "hp_buff": 0,
+    "att_buff": 2,
+    "def_buff": 0,
+    "regen_buff": 1,
+    "description": "Une pièce d'or fausse mais qui marche mieux qu'une vraie. Elle génère lentement de l'argent."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440523",
+    "name": "Épée du Petit Louis",
+    "level": 5,
+    "hp_buff": 40,
+    "att_buff": 15,
+    "def_buff": 8,
+    "regen_buff": 4,
+    "description": "L'épée du petit Louis. Elle crie COUCOU avant chaque coup. Absolument dévastateur."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440524",
+    "name": "Quenottes de Romain le Rusé",
+    "level": 4,
+    "hp_buff": 12,
+    "att_buff": 10,
+    "def_buff": 3,
+    "regen_buff": 1,
+    "description": "Les dents perlées du renard des surfaces. Parfait pour mordre les ennemis... et les amis."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440525",
+    "name": "Cristal de Val de la Mort",
+    "level": 5,
+    "hp_buff": 50,
+    "att_buff": 5,
+    "def_buff": 15,
+    "regen_buff": 8,
+    "description": "Un cristal provenant de la terre même de Val. Il gronde lentement et te rend indestructible."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440526",
+    "name": "Ouragan en Miniature de Toto",
+    "level": 5,
+    "hp_buff": 20,
+    "att_buff": 20,
+    "def_buff": 6,
+    "regen_buff": 2,
+    "description": "Un mini-ouragan qui tourbillonne. Toto le destructeur en miniature. EXTRÊMEMENT agressif."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440527",
+    "name": "Gobelet du Gobelin Gourmet",
+    "level": 1,
+    "hp_buff": 3,
+    "att_buff": 1,
+    "def_buff": 1,
+    "regen_buff": 1,
+    "description": "Un gobelet qui sent étrangement bon. Il contient les restes de mixtures de gobelin."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440528",
+    "name": "Toque du Cuisinier Fou",
+    "level": 2,
+    "hp_buff": 8,
+    "att_buff": 4,
+    "def_buff": 2,
+    "regen_buff": 0,
+    "description": "Une toque de chef qui vibre d'énergie culinaire. Elle crie 'C'EST BRÛLÉ !' de manière agressive."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440529",
+    "name": "Patte de Chevalier Sans-Gêne",
+    "level": 2,
+    "hp_buff": 8,
+    "att_buff": 4,
+    "def_buff": 5,
+    "regen_buff": 0,
+    "description": "Un os du squelette du chevalier. Il ne se sent pas mal de s'être perdu."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440530",
+    "name": "Orbe de Chaos Élémentaire",
+    "level": 3,
+    "hp_buff": 6,
+    "att_buff": 8,
+    "def_buff": 2,
+    "regen_buff": 5,
+    "description": "Un orbe qui pulse d'énergie chaotique. Ne sait pas ce qu'il veut mais il veut le faire FORT."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440531",
+    "name": "Pierre de Protéine",
+    "level": 1,
+    "hp_buff": 8,
+    "att_buff": 0,
+    "def_buff": 0,
+    "regen_buff": 0,
+    "description": "Une pierre magique qui augmente les muscles. Utile pour les gainers du dungeon."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440532",
+    "name": "Bague d'Invisibilité Cassée",
+    "level": 2,
+    "hp_buff": 0,
+    "att_buff": 3,
+    "def_buff": 5,
+    "regen_buff": 0,
+    "description": "Une bague qui marche une fois sur trois. Elle te rend invisible de manière aléatoire."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440533",
+    "name": "Potion de Chance Légèrement Empoisonnée",
+    "level": 2,
+    "hp_buff": 3,
+    "att_buff": 2,
+    "def_buff": 2,
+    "regen_buff": 1,
+    "description": "Une potion qui améliore tous les stats mais tu dois faire un truc bizarre après."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440534",
+    "name": "Dague du Dimanche",
+    "level": 1,
+    "hp_buff": 2,
+    "att_buff": 2,
+    "def_buff": 1,
+    "regen_buff": 0,
+    "description": "Une dague qui ne tue que le dimanche. Inutile le reste de la semaine mais elle essaie."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440535",
+    "name": "Bouteille de Rhum Magique",
+    "level": 3,
+    "hp_buff": 15,
+    "att_buff": 4,
+    "def_buff": 2,
+    "regen_buff": 2,
+    "description": "Une bouteille qui se remplit toute seule. Le rhum magique rend braver ET plus fort."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440536",
+    "name": "Masque du Héros Humilié",
+    "level": 2,
+    "hp_buff": 10,
+    "att_buff": 5,
+    "def_buff": 6,
+    "regen_buff": 1,
+    "description": "Un masque de héros qui a échoué plusieurs fois. Il donne vraiment envie de réussir."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440537",
+    "name": "Amulet de Trollface Invaincu",
+    "level": 4,
+    "hp_buff": 18,
+    "att_buff": 7,
+    "def_buff": 7,
+    "regen_buff": 3,
+    "description": "Une amulette qui affiche un trollface permanemment. Elle te rend invulnérable au cringe."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440538",
+    "name": "Sceptre de la Reine de la Nuit",
+    "level": 4,
+    "hp_buff": 10,
+    "att_buff": 12,
+    "def_buff": 3,
+    "regen_buff": 2,
+    "description": "Un sceptre qui ne s'active que la nuit. Il lance des sorts pour toi en silence."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440539",
+    "name": "Lunettes de Morgan",
+    "level": 4,
+    "hp_buff": 8,
+    "att_buff": 3,
+    "def_buff": 5,
+    "regen_buff": 0,
+    "description": "Des lunettes épaisses et tordues qui ont miraculeusement aidé Morgan à voir... et à oublier plus clair."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440540",
+    "name": "Chignon de Morgan",
+    "level": 4,
+    "hp_buff": 15,
+    "att_buff": 2,
+    "def_buff": 3,
+    "regen_buff": 3,
+    "description": "Un chignon aussi solide qu'un nid de pigeon rempli de ressorts. Offre une protection mystérieuse et une régénération constante."
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440541",
+    "name": "Insigne de Mr Charpentier",
+    "level": 5,
+    "hp_buff": 20,
+    "att_buff": 12,
+    "def_buff": 10,
+    "regen_buff": 4,
+    "description": "L'insigne du commandement de Mr Charpentier. À porter avec terreur et confusion. Il représente le mal incarné... qui ne vaut plus rien seul."
+  }
+]

@@ -1,0 +1,22 @@
+meta {
+  name: Connect User
+  type: http
+  seq: 3
+}
+
+post {
+  url: http://localhost:{{PORT}}/user/connect
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name":"notAdmin"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

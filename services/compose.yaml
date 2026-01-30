@@ -50,7 +50,27 @@ services:
     networks:
       - erjulrian-network
     restart: always
+  
+  db:
+    image: postgres:16-alpine
+    container_name: erjulrian-db
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=toto123
+      - POSTGRES_DB=erjulrian_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - erjulrian-network
+
+
+volumes:
+  db-data:
 
 networks:
   erjulrian-network:
     driver: bridge
+

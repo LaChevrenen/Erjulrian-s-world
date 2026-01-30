@@ -1,0 +1,13 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json ./
+COPY swagger.yaml ./
+RUN npm install --production
+
+COPY . .
+
+EXPOSE 3009
+
+CMD ["node", "server.js"]

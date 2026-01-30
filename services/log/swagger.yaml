@@ -1,0 +1,144 @@
+openapi: 3.0.3
+info:
+  title: Log Service API
+  description: Logs management
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3009/api
+
+tags:
+  - name: Logs
+
+paths:
+
+  /logs:
+    get:
+      tags: [Logs]
+      summary: List logs
+      parameters:
+        - name: user_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: level
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: service
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: eventType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Logs list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+    post:
+      tags: [Logs]
+      summary: Create a log entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLogRequest'
+      responses:
+        201:
+          description: Log created
+
+  /logs/{logId}:
+    get:
+      tags: [Logs]
+      summary: Get log details
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      responses:
+        200:
+          description: Log entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogEntry'
+
+components:
+
+  parameters:
+    LogId:
+      name: logId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+
+    CreateLogRequest:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        level:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        service:
+          type: string
+        eventType:
+          type: string
+        payload:
+          type: object
+
+    LogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        level:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        service:
+          type: string
+        eventType:
+          type: string
+        payload:
+          type: object

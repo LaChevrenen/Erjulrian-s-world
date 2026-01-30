@@ -12,6 +12,23 @@ services:
     networks:
       - erjulrian-network
     restart: always
+
+  log-service:
+    build: ./log
+    container_name: log-api
+    depends_on:
+      - rabbitmq
+      - elasticsearch
+    ports:
+      - "3009:3009"
+    environment:
+      - NODE_ENV=development
+      - PORT=3009
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    networks:
+      - erjulrian-network
+    restart: always
   
   rabbitmq:
     image: rabbitmq:3-management
@@ -21,6 +38,18 @@ services:
       - "15672:15672"
     networks:
       - erjulrian-network
+
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    container_name: log-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    networks:
+      - erjulrian-network
+    restart: always
 
 networks:
   erjulrian-network:

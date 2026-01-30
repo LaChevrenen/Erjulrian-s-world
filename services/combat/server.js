@@ -22,7 +22,9 @@ async function start() {
 
         console.log("Résultat du combat envoyé :", battleResult);
 
-    }, { noAck: true });
+        channel.ack(msg);
+
+    }, { noAck: false });
 }
 
 function battleTest()
@@ -209,5 +211,5 @@ function assertDataStructure(data)
     return true;
 }
 
-// start();
-battleTest();
+start();
+// battleTest();

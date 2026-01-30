@@ -1,0 +1,27 @@
+services:
+  combat-service:
+    build: ./combat
+    container_name: combat-api
+    depends_on:
+      - rabbitmq
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+    networks:
+      - erjulrian-network
+    restart: always
+  
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-broker
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - erjulrian-network
+
+networks:
+  erjulrian-network:
+    driver: bridge

@@ -1,6 +1,44 @@
-const amqp = require('amqplib'); // Pour RabbitMQ par exemple
+const amqp = require('amqplib'); // Pour RabbitMQ
+
+let logChannel;
+
+// RabbitMQ connection
+async function connectRabbitMQ() {
+    try {
+        const connection = await amqp.connect('amqp://rabbitmq:5672');
+        logChannel = await connection.createChannel();
+        const queue = 'log_queue';
+        await logChannel.assertQueue(queue, { durable: true });
+        console.log('Combat service connected to RabbitMQ');
+    } catch (error) {
+        console.error('Failed to connect to RabbitMQ:', error);
+        setTimeout(connectRabbitMQ, 5000);
+    }
+}
+
+// Send log to log service via RabbitMQ
+async function sendLog(heroId, level, eventType, payload) {
+    if (!logChannel) return;
+    
+    try {
+        const logData = {
+            user_id: heroId,
+            level: level,
+            timestamp: new Date().toISOString(),
+            service: 'combat',
+            eventType: eventType,
+            payload: payload
+        };
+        
+        logChannel.sendToQueue('log_queue', Buffer.from(JSON.stringify(logData)), { persistent: true });
+    } catch (error) {
+        console.error('Failed to send log:', error);
+    }
+}
 
 async function start() {
+    await connectRabbitMQ();
+    
     const connection = await amqp.connect('amqp://rabbitmq');
     const channel = await connection.createChannel();
     
@@ -9,9 +47,13 @@ async function start() {
 
     console.log("Service de combat en attente de messages...");
 
-    channel.consume(queue, (msg) => {
+    channel.consume(queue, async (msg) => {
         const combatData = JSON.parse(msg.content.toString());
+        const heroId = combatData.hero.heroId;
+        const monsterName = combatData.monster.name;
+        
         console.log("Combat reçu :", combatData);
+        await sendLog(heroId, 'info', 'combat_start', { monsterName, monsterType: combatData.monster.type });
 
         const battleResult = computeBattle(combatData);
         
@@ -21,6 +63,14 @@ async function start() {
         channel.sendToQueue(resultQueue, Buffer.from(JSON.stringify(battleResult)), { persistent: true });
 
         console.log("Résultat du combat envoyé :", battleResult);
+        
+        // Log combat result
+        const logLevel = battleResult.result === 'win' ? 'info' : 'warn';
+        await sendLog(heroId, logLevel, 'combat_end', { 
+            result: battleResult.result, 
+            monsterName, 
+            lootCount: (battleResult.loot || []).length 
+        });
 
         channel.ack(msg);
 

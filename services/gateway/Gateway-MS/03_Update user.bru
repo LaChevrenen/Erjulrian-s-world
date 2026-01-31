@@ -1,0 +1,36 @@
+meta {
+  name: 03_Update user
+  type: http
+  seq: 4
+}
+
+put {
+  url: http://localhost:{{PORT}}/user
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "id": "{{user_id}}",
+    "name": "ModifiedTestGateway",
+    "isAdmin": true
+  }
+}
+
+script:pre-request {
+  const user_id = bru.getVar("user_id");
+  
+  const token = bru.getVar("token");
+  req.setHeader("Authorization", `Bearer ${token}`);
+  
+}
+
+script:post-response {
+  bru.setVar("user_name", res.body.name);
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

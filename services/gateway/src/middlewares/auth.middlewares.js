@@ -4,7 +4,6 @@ const JWT_SECRET = 'votre-secret-tres-securise';
 
 
 export function auth (req, res, next) {
-    console.log("IN AUTH MIDDLEWARE");
     // Get the token
     const authHeader = req.headers.authorization;
     if(!authHeader) {

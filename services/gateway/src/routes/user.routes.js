@@ -11,5 +11,12 @@ router.post('/user/connect', (req, res) => {
 router.get('/user', auth, (req, res) => {
     forward(req, res, USER_SERVICE_URL);
 });
+router.post('/user', (req, res) => {
+    forward(req, res, USER_SERVICE_URL);
+});
+router.put('/user', auth, (req, res) => {
+    forward(req, res, USER_SERVICE_URL);
+});
+
 
 export default router;

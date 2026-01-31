@@ -4,6 +4,7 @@ const JWT_SECRET = 'votre-secret-tres-securise';
 
 
 export function auth (req, res, next) {
+    console.log("IN AUTH MIDDLEWARE");
     // Get the token
     const authHeader = req.headers.authorization;
     if(!authHeader) {
@@ -24,6 +25,6 @@ export function auth (req, res, next) {
         req.user = decoded;
         next();
     } catch (err) {
-        return res.status(401).json({ message: 'Token invalide ou expiré' });
+        return res.status(401).json({ message: 'Invalid or expired Token' });
     }
 };

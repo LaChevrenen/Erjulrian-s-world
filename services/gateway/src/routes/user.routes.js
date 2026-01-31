@@ -1,15 +1,15 @@
 import express from 'express';
 import {forward} from '../services/proxy.service.js'
 import {auth} from "../middlewares/auth.middlewares.js";
-
+const USER_SERVICE_URL = 'http://localhost:3001';
 const router = express.Router();
 
-router.get('/user/connect', (req, res) => {
-    forward(req, res, 'http://localhost:3001');
+router.post('/user/connect', (req, res) => {
+    forward(req, res, USER_SERVICE_URL);
 });
 
 router.get('/user', auth, (req, res) => {
-    forward(req, res, 'http://localhost:3001');
+    forward(req, res, USER_SERVICE_URL);
 });
 
 export default router;

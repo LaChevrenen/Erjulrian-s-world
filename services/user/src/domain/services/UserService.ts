@@ -13,7 +13,11 @@ export class UserService implements UserServicePort {
     async connect(name: string): Promise<string | null> {
         const user = await this.repo.findByName(name);
         if (!user) return null;
-        const token = jwt.sign(user, this.JWT_SECRET, {expiresIn: this.JWT_EXPIRATION} as jwt.SignOptions);
+        const token = jwt.sign({
+            id: user.id,
+            name: user.name,
+            isAdmin: user.isAdmin
+        }, this.JWT_SECRET);
         return Promise.resolve(token);
     }
 

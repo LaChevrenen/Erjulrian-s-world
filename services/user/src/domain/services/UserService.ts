@@ -7,7 +7,8 @@ export class UserService implements UserServicePort {
     constructor(private repo: UserRepositoryPort) {}
 
     // Configuration JWT
-    JWT_SECRET = process.env.JWT_SECRET || 'votre-secret-tres-securise';
+    JWT_SECRET = process.env.JWT_SECRET || 'notre-super-secret-securise';
+
     JWT_EXPIRATION = '24h';
 
     async connect(name: string): Promise<string | null> {

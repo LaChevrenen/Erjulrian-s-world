@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = 'votre-secret-tres-securise';
+const JWT_SECRET = 'notre-super-secret-securise';
 
 
 export function auth (req, res, next) {

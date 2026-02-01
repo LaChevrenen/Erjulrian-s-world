@@ -1,29 +1,29 @@
 import Router from 'express';
 import {forward} from '../services/proxy.service.js';
 import {auth} from '../middlewares/auth.middlewares.js';
-const USER_SERVICE_URL = 'http://localhost:3003';
+const HERO_SERVICE_URL = 'http://localhost:3003';
 
 const heroRouter = Router();
 
 // Create a hero
 heroRouter.post('/', auth, (req, res) => {
-    forward(req, res, USER_SERVICE_URL);
+    forward(req, res, HERO_SERVICE_URL);
 });
 // Get hero with Id
 heroRouter.get('/:heroId', auth, (req, res) => {
-    forward(req, res, USER_SERVICE_URL);
+    forward(req, res, HERO_SERVICE_URL);
 });
 // Modify hero with Id
 heroRouter.put('/:heroId', auth, (req, res) => {
-    forward(req, res, USER_SERVICE_URL);
+    forward(req, res, HERO_SERVICE_URL);
 });
 // Delete hero with Id
 heroRouter.delete('/:heroId', auth, (req, res) => {
-    forward(req, res, USER_SERVICE_URL);
+    forward(req, res, HERO_SERVICE_URL);
 });
 // Add xp to hero
 heroRouter.post('/:heroId/xp', auth, (req, res) => {
-    forward(req, res, USER_SERVICE_URL);
+    forward(req, res, HERO_SERVICE_URL);
 });
 
 export default heroRouter;

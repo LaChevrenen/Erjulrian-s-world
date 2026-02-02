@@ -46,12 +46,124 @@ async function connectRabbitMQ() {
     try {
         const connection = await amqp.connect(RABBITMQ_URL);
         rabbitChannel = await connection.createChannel();
-        const queue = 'log_queue';
-        await rabbitChannel.assertQueue(queue, { durable: true });
+        
+        // Assert queues
+        const logQueue = await rabbitChannel.assertQueue('log_queue', { durable: true });
+        const heroQueue = await rabbitChannel.assertQueue('hero_queue', { durable: true });
+        
+        console.log('✓ log_queue created:', logQueue.queue);
+        console.log('✓ hero_queue created:', heroQueue.queue);
         console.log('Connected to RabbitMQ');
+        
+        // Start consuming hero queue
+        startHeroConsumer();
     } catch (error) {
         console.error('Failed to connect to RabbitMQ:', error);
         setTimeout(connectRabbitMQ, 5000);
+    }
+}
+
+async function startHeroConsumer() {
+    if (!rabbitChannel) {
+        console.error('Cannot start hero consumer: rabbitChannel is null');
+        return;
+    }
+    
+    try {
+        console.log('Starting hero queue consumer...');
+        rabbitChannel.consume('hero_queue', async (msg) => {
+            if (msg !== null) {
+                const request = JSON.parse(msg.content.toString());
+                console.log('Hero request received:', request);
+                
+                try {
+                    const { action, heroId, xp, hp, stats } = request;
+                    
+                    switch (action) {
+                        case 'get':
+                            // GET hero stats
+                            const heroResult = await dbClient.query(
+                                'SELECT * FROM hero_schema.HeroStats WHERE hero_id = $1',
+                                [heroId]
+                            );
+                            
+                            if (heroResult.rowCount > 0) {
+                                console.log(`Retrieved stats for hero ${heroId}`);
+                            }
+                            break;
+                            
+                        case 'update_hero':
+                            // Combined hero update - handle XP and HP in one operation
+                            const xpDelta = request.xpDelta || 0;
+                            const hpDelta = request.hpDelta || 0;
+                            
+                            const currentHeroResult = await dbClient.query(
+                                'SELECT * FROM hero_schema.HeroStats WHERE hero_id = $1',
+                                [heroId]
+                            );
+                            
+                            if (currentHeroResult.rowCount === 0) {
+                                console.warn(`Hero ${heroId} not found`);
+                                break;
+                            }
+                            
+                            const currentHero = currentHeroResult.rows[0];
+                            let updateQueries = [];
+                            let newLevel = currentHero.level;
+                            let newXp = currentHero.xp;
+                            let newHp = currentHero.base_hp;
+                            
+                            // Handle XP update
+                            if (xpDelta !== 0) {
+                                newXp = currentHero.xp + xpDelta;
+                                newLevel = calculateLevel(newXp);
+                                
+                                await dbClient.query(
+                                    'UPDATE hero_schema.HeroStats SET xp = $1, level = $2, updated_at = NOW() WHERE hero_id = $3',
+                                    [newXp, newLevel, heroId]
+                                );
+                                
+                                if (xpDelta > 0) {
+                                    await sendLog(heroId, 1, 'xp_added', { hero_id: heroId, xp_added: xpDelta, new_level: newLevel });
+                                    console.log(`Added ${xpDelta} XP to hero ${heroId}, new level: ${newLevel}`);
+                                }
+                            }
+                            
+                            // Handle HP update
+                            if (hpDelta !== 0) {
+                                newHp = Math.max(0, currentHero.base_hp + hpDelta);
+                                
+                                await dbClient.query(
+                                    'UPDATE hero_schema.HeroStats SET base_hp = $1, updated_at = NOW() WHERE hero_id = $2',
+                                    [newHp, heroId]
+                                );
+                                
+                                if (hpDelta > 0) {
+                                    await sendLog(heroId, 1, 'hp_healed', { hero_id: heroId, hp_restored: hpDelta, new_hp: newHp });
+                                    console.log(`Healed ${hpDelta} HP to hero ${heroId}, new HP: ${newHp}`);
+                                } else {
+                                    await sendLog(heroId, 1, 'hp_lost', { hero_id: heroId, hp_lost: Math.abs(hpDelta), new_hp: newHp });
+                                    console.log(`Hero ${heroId} lost ${Math.abs(hpDelta)} HP, remaining: ${newHp}`);
+                                }
+                            }
+                            
+                            console.log(`Updated hero ${heroId}: xp=${xpDelta}, hp=${hpDelta}`);
+                            break;
+                            
+                        default:
+                            console.warn(`Unknown action: ${action}`);
+                    }
+                } catch (error) {
+                    console.error('Error processing hero request:', error);
+                }
+                
+                rabbitChannel.ack(msg);
+            }
+        });
+        
+        console.log('Hero queue consumer started');
+    } catch (error) {
+        console.error('Failed to start hero consumer:', error);
     }
 }
 
@@ -72,6 +184,22 @@ async function sendLog(userId, level, eventType, payload) {
         rabbitChannel.sendToQueue('log_queue', Buffer.from(JSON.stringify(logData)), { persistent: true });
     } catch (error) {
         console.error('Failed to send log:', error);
+    }
+}
+
+async function publishHeroEvent(eventType, data) {
+    if (!rabbitChannel) return;
+
+    try {
+        const event = {
+            type: eventType,
+            timestamp: new Date().toISOString(),
+            ...data
+        };
+
+        rabbitChannel.sendToQueue('hero_queue', Buffer.from(JSON.stringify(event)), { persistent: true });
+    } catch (error) {
+        console.error('Failed to publish hero event:', error);
     }
 }
 
@@ -116,6 +244,7 @@ app.post('/api/heroes', async (req, res) => {
         
         // Send log
         await sendLog(userId, 1, 'hero_created', { hero_id: userId, initial_stats: { hp: 20, att: 4, def: 1, regen: 1 } });
+        await publishHeroEvent('hero_created', { heroId: userId });
         
         res.status(201).json({ heroId: result.rows[0].hero_id });
     } catch (error) {

@@ -1,14 +1,8 @@
 export async function forward(req, res, target) {
     try {
-        // Gérer le cas où req.body est undefined (GET, DELETE, etc.)
         const bodyString = req.body ? JSON.stringify(req.body) : null;
+        const headers = { ...req.headers, host: undefined };
 
-        const headers = {
-            ...req.headers,
-            host: undefined
-        };
-
-        // Recalculer content-length seulement si on a un body
         if (bodyString) {
             headers['content-length'] = Buffer.byteLength(bodyString);
         } else {
@@ -21,11 +15,20 @@ export async function forward(req, res, target) {
             body: bodyString || undefined
         });
 
-        const data = await response.json();
-        res.status(response.status).send(data);
+        // ✅ FIX : Vérifiez content-type AVANT json()
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType?.includes('application/json')) {
+            const data = await response.json();
+            res.status(response.status).json(data);
+        } else {
+            // Forward RAW response (HTML, text, etc.)
+            const text = await response.text();
+            res.status(response.status).send(text);
+        }
     }
     catch (error) {
         console.error('Proxy error:', error);
-        res.status(500).send({ error: error.message });
+        res.status(500).json({ error: error.message });
     }
 }

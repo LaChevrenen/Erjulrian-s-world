@@ -1,4 +1,27 @@
 services:
+
+  gateway-service:
+    build: ./gateway
+    container_name: gateway-api
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - USER_PORT=3001
+      - COMBAT_PORT=3002
+      - LOG_PORT=3009
+      - HERO_PORT=3003
+      - INVENTORY_PORT=3004
+    networks:
+      - erjulrian-network
+    restart: always 
+
   user-service:
     build: ./user
     container_name: user-api

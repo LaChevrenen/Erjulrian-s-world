@@ -1,0 +1,31 @@
+meta {
+  name: Create a log
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:3000/log
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjBhYTg4ZTQ5LWRmODMtNDVhOS05M2VlLTlmNmI2ZTkzYzZiMSIsImlzQWRtaW4iOmZhbHNlLCJpYXQiOjE3NzAwMzEwOTR9.gCLq7nc4fk7lPQawJQGEAxll9xafpIXJh8opjJ7Q5ZU
+}
+
+body:json {
+  {
+    "user_id": "0aa88e49-df83-45a9-93ee-9f6b6e93c6b1",
+    "level": 0,
+    "timestamp": "2026-02-02T11:17:02.303Z",
+    "service": "truc",
+    "eventType": "chose",
+    "payload": {}
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

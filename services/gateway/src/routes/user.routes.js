@@ -1,7 +1,7 @@
 import Router from 'express';
 import {forward} from '../services/proxy.service.js';
 import {auth} from '../middlewares/auth.middlewares.js';
-const USER_SERVICE_URL = 'http://localhost:3001';
+const USER_SERVICE_URL = 'http://user-api:3001';
 
 
 const userRouter = Router();

@@ -99,6 +99,13 @@ async function start() {
             console.log("Loot sent to inventory service:", battleResult);
         }
 
+        // send message to hero service to update hero xp and hp
+        battleResult.action = 'update_hero';
+        const heroQueue = 'hero_queue';
+        channel.assertQueue(heroQueue, { durable: true });
+        channel.sendToQueue(heroQueue, Buffer.from(JSON.stringify(battleResult)), { persistent: true });
+        console.log("Update sent to hero service:", battleResult);
+
         channel.ack(msg);
 
     }, { noAck: false });
@@ -175,6 +182,7 @@ function computeBattle(combatData)
 
     let round = 0;
     let gold = 0;
+    let xp = 0;
 
     // extract stats needed for logging
     let monsterName = combatData.monster.name;
@@ -188,6 +196,8 @@ function computeBattle(combatData)
         console.log(`Round ${round}: you deals ${damageToMonster} damage to ${monsterName}. ${monsterName} HP: ${monsterHp}`);
         // earn two gold per per damage dealt
         gold += damageToMonster * 2;
+        // earn one xp per damage dealt
+        xp += damageToMonster * 1;
 
         if (monsterHp <= 0) break; // Monster defeated
 
@@ -225,6 +235,8 @@ function computeBattle(combatData)
 
     // Add earned gold to the result
     battleJson.gold = Math.max(0, gold);
+    // Add earned xp to the result
+    battleJson.xpDelta = xp;
 
     // Compyte battle loot if hero wins
     if (battleJson.result === "win") {
@@ -246,7 +258,7 @@ function computeBattle(combatData)
     }
     
     battleJson.heroId = combatData.hero.heroId;
-    battleJson.remainingHp = Math.max(0, heroHp);
+    battleJson.hpDelta = Math.max(0, heroHp);
 
     return battleJson;
 }

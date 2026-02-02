@@ -1,0 +1,185 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: User api
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:3001
+paths:
+  /user:
+    get:
+      summary: List all users
+      operationId: findAll
+      tags:
+        - user
+      parameters:
+        - searchCriteria:
+            required: false
+      responses:
+        '200':
+          description: Users where found
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    put:
+      summary: Modify the user
+      operationId: update
+      tags:
+        - user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The user id
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: The User was modified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    post:
+      summary: Create a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      operationId: create
+      tags:
+        - user
+      responses:
+        '200':
+          description: A user was created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+
+  /user/{id}:
+    get:
+      summary: Get the user by ID
+      operationId: findById
+      tags:
+        - user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The user id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A user was found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      summary: Deletes the user
+      operationId: delete
+      tags:
+        - user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The user id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The User was modified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /user/check/{name}:
+    get:
+      summary: Check if user name already exists
+      operationId: isNameTaken
+      tags:
+        - user
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The user name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A user with this name was found
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  /user/connect:
+    post:
+      summary: Connects the user
+      operationId: connect
+      tags:
+        - auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: The user was connected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: "#/components/schemas/User"
+
+
+components:
+  schemas:
+    User:
+      required:
+        - id
+        - name
+        - isAdmin
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string # Add validation to prevent bad chars
+        isAdmin:
+          type: boolean
+    UserInput:
+      required:
+        - name
+        - isAdmin
+      properties:
+        name:
+          type: string # Add validation to prevent bad chars
+        isAdmin:
+          type: boolean

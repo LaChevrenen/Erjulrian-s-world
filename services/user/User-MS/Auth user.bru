@@ -1,0 +1,22 @@
+meta {
+  name: Auth user
+  type: http
+  seq: 8
+}
+
+post {
+  url: http://localhost:3000/user/connect
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "notAdmin"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

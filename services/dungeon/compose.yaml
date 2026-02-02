@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  dungeon-service:
+    build: .
+    container_name: dungeon-service
+    ports:
+      - "3005:3005"
+    environment:
+      MONGO_URL: mongodb://mongo:27017/erjulrian_dungeon
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      PORT: 3005
+    depends_on:
+      - mongo
+      - rabbitmq
+    networks:
+      - erjulrian-network
+
+  mongo:
+    image: mongo:latest
+    container_name: dungeon-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: erjulrian_dungeon
+    volumes:
+      - dungeon-mongo-data:/data/db
+    networks:
+      - erjulrian-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: dungeon-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - erjulrian-network
+
+volumes:
+  dungeon-mongo-data:
+
+networks:
+  erjulrian-network:
+    driver: bridge

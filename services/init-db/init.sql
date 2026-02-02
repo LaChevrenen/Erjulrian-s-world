@@ -27,7 +27,8 @@ CREATE TABLE inventory_schema.InventoryItems (
   hero_id char(36),
   artifact_id char(36),
   quantity int,
-  equipped boolean
+  equipped boolean,
+  PRIMARY KEY (hero_id, artifact_id)
 );
 
 -- ###########################################

@@ -5,10 +5,10 @@ services:
     depends_on:
       - rabbitmq
     ports:
-      - "3005:3005"
+      - "3000:3000"
     environment:
       - NODE_ENV=development
-      - PORT=3005
+      - PORT=3000
     networks:
       - erjulrian-network
     restart: always
@@ -108,9 +108,38 @@ services:
     networks:
       - erjulrian-network
 
+  dungeon-service:
+    build: ./dungeon
+    container_name: dungeon-api
+    depends_on:
+      - mongo
+      - rabbitmq
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - MONGO_URL=mongodb://mongo:27017/erjulrian_dungeon
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    networks:
+      - erjulrian-network
+    restart: always
+  
+  mongo:
+    image: mongo:latest
+    container_name: erjulrian-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=erjulrian_dungeon
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - erjulrian-network
 
 volumes:
   db-data:
+  mongo-data:
 
 networks:
   erjulrian-network:

@@ -73,7 +73,9 @@ async function startInventoryConsumer() {
         console.log('Inventory request received:', request);
         
         try {
-          const { action, heroId } = request;
+          const heroId = request.heroId;
+          const action = request.action;
+          // const { action, heroId } = request;
           
           switch (action) {
             case 'get':
@@ -95,9 +97,8 @@ async function startInventoryConsumer() {
             case 'update_inventory':
               // Combined inventory update - handle gold and items in one operation
               // goldDelta can be positive (add) or negative (remove)
-              const goldDelta = request.goldDelta || 0;
-              const itemsToAdd = request.itemsToAdd || [];
-              const itemsToRemove = request.itemsToRemove || [];
+              const goldDelta = request.gold || 0;
+              const itemsToAdd = request.items || [];
               
               // Update gold if there's a change
               if (goldDelta !== 0) {
@@ -140,20 +141,6 @@ async function startInventoryConsumer() {
                 await sendLog(heroId, 1, 'artifact_added', { hero_id: heroId, artifact_id: item.artifactId, quantity: item.quantity || 1 });
                 console.log(`Added artifact ${item.artifactId} (qty: ${item.quantity || 1}) to hero ${heroId}`);
               }
-              
-              // Remove items
-              for (const itemId of itemsToRemove) {
-                await dbClient.query(
-                  `DELETE FROM inventory_schema.InventoryItems 
-                   WHERE hero_id = $1 AND artifact_id = $2`,
-                  [heroId, itemId]
-                );
-                
-                await sendLog(heroId, 1, 'artifact_removed', { hero_id: heroId, artifact_id: itemId });
-                console.log(`Removed artifact ${itemId} from hero ${heroId}`);
-              }
-              
-              console.log(`Updated inventory for hero ${heroId}: gold=${goldDelta}, items_added=${itemsToAdd.length}, items_removed=${itemsToRemove.length}`);
               break;
               
             default:

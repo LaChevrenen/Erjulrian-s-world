@@ -7,6 +7,7 @@
     "test": "node test-scenario.js",
     "test:advanced": "node test-advanced.js",
     "test:comprehensive": "node test-comprehensive.js",
+    "test:hero-user": "node test-hero-user-separation.js",
     "test:all": "node test-scenario.js && node test-advanced.js && node test-comprehensive.js",
     "seed:game-data": "node scripts/seed-game-data.js"
   },

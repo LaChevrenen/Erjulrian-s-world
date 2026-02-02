@@ -28,8 +28,9 @@ userController.registerRoutes(app);
 
 app.use(errorHandler);
 
-const port = process.env.PORT || 3001;
-app.listen(port, () => {
-  console.log(`Server listening on http://localhost:${port}`);
-  console.log(`Swagger docs at http://localhost:${port}/docs`);
+const port = parseInt(process.env.PORT || '3001', 10);
+
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server listening on http://0.0.0.0:${port}`);
+  console.log(`Swagger docs at http://0.0.0.0:${port}/docs`);
 });

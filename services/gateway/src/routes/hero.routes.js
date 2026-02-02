@@ -13,6 +13,10 @@ heroRouter.post('/', auth, (req, res) => {
 heroRouter.get('/:heroId', auth, (req, res) => {
     forward(req, res, HERO_SERVICE_URL);
 });
+// Get heroes for a user
+heroRouter.get('/:userId/list', auth, (req, res) => {
+    forward(req, res, HERO_SERVICE_URL);
+})
 // Modify hero with Id
 heroRouter.put('/:heroId', auth, (req, res) => {
     forward(req, res, HERO_SERVICE_URL);

@@ -22,5 +22,4 @@ app.use('/api/logs', logRouter);
 app.use('/api/dungeons', dungeonRouter);
 
 
-
 export default app;

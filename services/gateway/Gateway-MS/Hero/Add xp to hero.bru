@@ -1,12 +1,12 @@
 meta {
-  name: 02_Get Users
+  name: Add xp to hero
   type: http
-  seq: 2
+  seq: 4
 }
 
-get {
-  url: http://localhost:{{PORT}}/user
-  body: none
+post {
+  url: http://localhost:3000/api/heroes/d634f66f-6eb2-4f51-b507-ad3fc3ad37b1/xp
+  body: json
   auth: bearer
 }
 
@@ -14,9 +14,10 @@ auth:bearer {
   token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImQxZDg4YTZjLWUwYmEtNGY2Zi1hYmY4LTE0YWRmMDg4Njg2NCIsImlzQWRtaW4iOmZhbHNlLCJpYXQiOjE3NzAwNjMyNDh9.30NDYcI0oxMGHefH1DKN9tkOq24tZYt6vk2M3tq7elI
 }
 
-script:pre-request {
-  //const token = bru.getVar("token");
-  //req.setHeader("Authorization", `Bearer ${token}`);
+body:json {
+  {
+    "xp": 100
+  }
 }
 
 settings {

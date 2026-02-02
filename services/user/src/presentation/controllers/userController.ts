@@ -91,10 +91,12 @@ export class UserController {
         if(!name) {
             return res.status(400).json({ message: 'Request badly formatted' });
         }
-        const token = await this.userService.connect(name);
-        if(!token) {
+        const retVal = await this.userService.connect(name);
+        if(!retVal) {
             return res.status(404).json({ message: 'Auth failed' });
         }
-        return res.status(200).json(token);
+
+        
+        return res.status(200).json(retVal);
     }
 }

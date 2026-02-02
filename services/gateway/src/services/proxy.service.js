@@ -15,7 +15,7 @@ export async function forward(req, res, target) {
             body: bodyString || undefined
         });
 
-        // ✅ FIX : Vérifiez content-type AVANT json()
+        // Check content type to handle it better
         const contentType = response.headers.get('content-type');
         
         if (contentType?.includes('application/json')) {

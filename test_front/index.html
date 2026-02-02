@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Connexion</title>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('login')">Connexion</button>
+      <button class="tab" onclick="showTab('register')">Inscription</button>
+    </div>
+
+    <!-- Formulaire de connexion -->
+    <form id="login-form" class="auth-form">
+      <h2>Connexion</h2>
+      <input type="text" name="username" placeholder="Nom d'utilisateur" required>
+      <button type="submit">Se connecter</button>
+      <div id="login-error" class="error"></div>
+    </form>
+
+    <!-- Formulaire d'inscription -->
+    <form id="register-form" class="auth-form" style="display: none;">
+      <h2>Inscription</h2>
+      <input type="text" name="username" placeholder="Nom d'utilisateur" required>
+      <button type="submit">S'inscrire</button>
+      <div id="register-error" class="error"></div>
+    </form>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    // Si déjà connecté, rediriger vers heroes
+    redirectIfAuthenticated();
+
+    // Gestion des onglets
+    function showTab(tab) {
+      document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('register-form').style.display = tab === 'register' ? 'block' : 'none';
+      
+      // Gérer l'apparence des onglets
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+    }
+
+    // Formulaire de connexion
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const username = formData.get('username');
+      
+      try {
+        await login(username);
+        // La redirection est gérée dans login()
+      } catch (error) {
+        document.getElementById('login-error').textContent = 
+          'Impossible de se connecter avec cet utilisateur';
+      }
+    });
+
+    // Formulaire d'inscription
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const username = formData.get('username');
+      
+      try {
+        await register(username);
+        // La redirection est gérée dans register()
+      } catch (error) {
+        document.getElementById('register-error').textContent = 
+          'Erreur lors de l\'inscription';
+      }
+    });
+  </script>
+</body>
+</html>

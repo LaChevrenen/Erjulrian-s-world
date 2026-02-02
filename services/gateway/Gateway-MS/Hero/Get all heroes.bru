@@ -1,11 +1,11 @@
 meta {
-  name: 02_Get Users
+  name: Get all heroes
   type: http
-  seq: 2
+  seq: 3
 }
 
 get {
-  url: http://localhost:{{PORT}}/user
+  url: http://localhost:3000/api/heroes/c1f9820d-faed-4661-a90b-83b4111daf7f/list
   body: none
   auth: bearer
 }
@@ -14,9 +14,10 @@ auth:bearer {
   token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImQxZDg4YTZjLWUwYmEtNGY2Zi1hYmY4LTE0YWRmMDg4Njg2NCIsImlzQWRtaW4iOmZhbHNlLCJpYXQiOjE3NzAwNjMyNDh9.30NDYcI0oxMGHefH1DKN9tkOq24tZYt6vk2M3tq7elI
 }
 
-script:pre-request {
-  //const token = bru.getVar("token");
-  //req.setHeader("Authorization", `Bearer ${token}`);
+body:json {
+  {
+    "userId": "c1f9820d-faed-4661-a90b-83b4111daf7f"
+  }
 }
 
 settings {

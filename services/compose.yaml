@@ -132,13 +132,13 @@ services:
       - ./init-db:/docker-entrypoint-initdb.d
     networks:
       - erjulrian-network
-    healthcheck:  # ← AJOUTEZ ÇA !
+    healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-    restart: always  # ← Et ça aussi
+    restart: always
 
   mongo:
     image: mongo:latest

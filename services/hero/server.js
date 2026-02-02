@@ -218,8 +218,8 @@ app.post('/api/heroes', async (req, res) => {
         }
 
         const query = `
-            INSERT INTO hero_schema.HeroStats (user_id, level, xp, base_hp, base_att, base_def, base_regen, artifact_slot_1, artifact_slot_2, artifact_slot_3, artifact_slot_4, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8::uuid, $9::uuid, $10::uuid, $11::uuid, NOW())
+            INSERT INTO hero_schema.HeroStats (user_id, level, xp, base_hp, current_hp, base_att, base_def, base_regen, artifact_slot_1, artifact_slot_2, artifact_slot_3, artifact_slot_4, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::uuid, $10::uuid, $11::uuid, $12::uuid, NOW())
             RETURNING hero_id, user_id
         `;
         
@@ -229,6 +229,7 @@ app.post('/api/heroes', async (req, res) => {
             1,           // level
             0,           // xp
             20,          // base_hp
+            20,          // current_hp (initialized to max)
             4,           // base_att
             1,           // base_def
             1,           // base_regen
@@ -301,7 +302,7 @@ app.put('/api/heroes/:heroId', async (req, res) => {
         const values = [];
         let paramIndex = 1;
         
-        const allowedFields = ['level', 'xp', 'base_hp', 'base_att', 'base_def', 'base_regen', 
+        const allowedFields = ['level', 'xp', 'base_hp', 'current_hp', 'base_att', 'base_def', 'base_regen', 
                                'artifact_slot_1', 'artifact_slot_2', 'artifact_slot_3', 'artifact_slot_4'];
         
         for (const field of allowedFields) {

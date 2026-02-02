@@ -78,6 +78,7 @@ CREATE TABLE hero_schema.HeroStats (
   level INT DEFAULT 1,
   xp INT DEFAULT 0,
   base_hp INT DEFAULT 20,
+  current_hp INT DEFAULT 20,
   base_att INT DEFAULT 4,
   base_def INT DEFAULT 1,
   base_regen INT DEFAULT 1,

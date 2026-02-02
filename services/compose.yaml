@@ -1,14 +1,38 @@
 services:
+  user-service:
+    build: ./user
+    container_name: user-api
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=user_user
+      - DB_PASSWORD=user_password
+      - DB_NAME=erjulrian_db
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    networks:
+      - erjulrian-network
+    restart: always
+
   combat-service:
     build: ./combat
     container_name: combat-api
     depends_on:
       - rabbitmq
     ports:
-      - "3000:3000"
+      - "3002:3002"
     environment:
       - NODE_ENV=development
-      - PORT=3000
+      - PORT=3002
+      - RABBITMQ_URL=amqp://rabbitmq:5672
     networks:
       - erjulrian-network
     restart: always
@@ -80,6 +104,7 @@ services:
       - "15672:15672"
     networks:
       - erjulrian-network
+    restart: always
 
   elasticsearch:
     image: elasticsearch:8.11.0
@@ -107,7 +132,6 @@ services:
       - ./init-db:/docker-entrypoint-initdb.d
     networks:
       - erjulrian-network
-
   dungeon-service:
     build: ./dungeon
     container_name: dungeon-api
@@ -122,6 +146,7 @@ services:
       - PORT=3005
       - MONGO_URL=mongodb://mongo:27017/erjulrian_dungeon
       - RABBITMQ_URL=amqp://rabbitmq:5672
+      - HERO_API_URL=http://hero-service:3003/api
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=inventory_user
@@ -129,19 +154,13 @@ services:
       - DB_NAME=erjulrian_db
     networks:
       - erjulrian-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: always
-  
-  mongo:
-    image: mongo:latest
-    container_name: erjulrian-mongo
-    ports:
-      - "27017:27017"
-    environment:
-      - MONGO_INITDB_DATABASE=erjulrian_dungeon
-    volumes:
-      - mongo-data:/data/db
-    networks:
-      - erjulrian-network
 
 volumes:
   db-data:
@@ -150,4 +169,3 @@ volumes:
 networks:
   erjulrian-network:
     driver: bridge
-

@@ -119,6 +119,7 @@ function battleTest()
             "level": 1,
             "xp": 0,
             "stats": {
+                "current_hp": 20,
                 "hp": 20,
                 "att": 4,
                 "def": 1,
@@ -170,12 +171,14 @@ function computeBattle(combatData)
     const heroStats = combatData.hero.stats;
     const monsterStats = combatData.monster.stats;
 
-    let heroHp = heroStats.hp;
+    let heroHp = heroStats.current_hp;
+    let heroMaxHp = heroStats.hp;
     let heroAtt = heroStats.att;
     let heroDef = heroStats.def;
     let heroRegen = heroStats.regen;
-
+    
     let monsterHp = monsterStats.hp;
+    let monsterMaxHp = monsterStats.hp;
     let monsterAtt = monsterStats.att;
     let monsterDef = monsterStats.def;
     let monsterRegen = monsterStats.regen;
@@ -213,7 +216,10 @@ function computeBattle(combatData)
         // Both regenerate
         heroHp += heroRegen;
         monsterHp += monsterRegen;
-
+        // Ensure HP doesn't exceed max HP
+        heroHp = Math.min(heroHp, heroMaxHp);
+        monsterHp = Math.min(monsterHp, monsterMaxHp);
+        
         round++;
         // After 10 round enemys get boosted
         if (round % 10 === 0) {

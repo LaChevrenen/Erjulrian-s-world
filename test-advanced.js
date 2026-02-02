@@ -49,11 +49,13 @@ async function testHeroQueue() {
     console.log('\n🧪 TEST SUITE: Hero Queue');
     console.log('='.repeat(60));
     
-    const heroId = randomUUID();
+    const userId = randomUUID();
+    let heroId = null;
     
     // Create hero via REST
-    const heroRes = await axios.post(`${HERO_API}/heroes`, { userId: heroId });
-    logTest('Create hero via REST', heroRes.data.heroId === heroId);
+    const heroRes = await axios.post(`${HERO_API}/heroes`, { userId });
+    heroId = heroRes.data.heroId;
+    logTest('Create hero via REST', Boolean(heroId));
     
     await sleep(500);
     
@@ -102,6 +104,8 @@ async function testHeroQueue() {
 async function testInventoryQueue(heroId) {
     console.log('\n🧪 TEST SUITE: Inventory Queue');
     console.log('='.repeat(60));
+    const ironSwordId = randomUUID();
+    const healthPotionId = randomUUID();
     
     // Create inventory
     await axios.post(`${INVENTORY_API}/inventory`, { heroId, gold: 200 });
@@ -135,16 +139,16 @@ async function testInventoryQueue(heroId) {
     
     // Test 4: Add multiple items via queue
     console.log('\n📍 Test: Add items via inventory_queue');
-    await sendToQueue('inventory_queue', { action: 'add_item', heroId, artifact: { artifactId: 'iron-sword', quantity: 1 } });
+    await sendToQueue('inventory_queue', { action: 'add_item', heroId, artifact: { artifactId: ironSwordId, quantity: 1 } });
     await sleep(500);
-    await sendToQueue('inventory_queue', { action: 'add_item', heroId, artifact: { artifactId: 'health-potion', quantity: 5 } });
+    await sendToQueue('inventory_queue', { action: 'add_item', heroId, artifact: { artifactId: healthPotionId, quantity: 5 } });
     await sleep(500);
-    await sendToQueue('inventory_queue', { action: 'add_item', heroId, artifact: { artifactId: 'iron-sword', quantity: 2 } });
+    await sendToQueue('inventory_queue', { action: 'add_item', heroId, artifact: { artifactId: ironSwordId, quantity: 2 } });
     await sleep(1000);
     
     inventory = (await axios.get(`${INVENTORY_API}/inventory/${heroId}`)).data;
-    const ironSword = inventory.items.find(i => i.artifactId.trim() === 'iron-sword');
-    const healthPotion = inventory.items.find(i => i.artifactId.trim() === 'health-potion');
+    const ironSword = inventory.items.find(i => i.artifactId === ironSwordId);
+    const healthPotion = inventory.items.find(i => i.artifactId === healthPotionId);
     
     logTest('Items added correctly', 
         ironSword && ironSword.quantity === 3 && healthPotion && healthPotion.quantity === 5,
@@ -152,11 +156,11 @@ async function testInventoryQueue(heroId) {
     
     // Test 5: Remove item via queue
     console.log('\n📍 Test: Remove item via inventory_queue');
-    await sendToQueue('inventory_queue', { action: 'remove_item', heroId, artifact: { artifactId: 'health-potion' } });
+    await sendToQueue('inventory_queue', { action: 'remove_item', heroId, artifact: { artifactId: healthPotionId } });
     await sleep(1000);
     
     inventory = (await axios.get(`${INVENTORY_API}/inventory/${heroId}`)).data;
-    const hasPotion = inventory.items.some(i => i.artifactId.trim() === 'health-potion');
+    const hasPotion = inventory.items.some(i => i.artifactId === healthPotionId);
     logTest('Item removed correctly', !hasPotion, `Health Potion removed: ${!hasPotion}`);
     
     // Test 6: Get inventory via queue
@@ -177,11 +181,18 @@ async function testMultipleHeroes() {
     console.log(`\n📍 Test: Create ${heroCount} heroes in parallel`);
     const createPromises = [];
     for (let i = 0; i < heroCount; i++) {
-        const heroId = randomUUID();
-        heroes.push(heroId);
+        const userId = randomUUID();
+        const initialGold = 100 * (i + 1);
+        const expectedXP = (i + 1) * 100;
+        const goldDelta = (i + 1) * 50;
+        const expectedGold = initialGold + goldDelta;
         createPromises.push(
-            axios.post(`${HERO_API}/heroes`, { userId: heroId })
-                .then(() => axios.post(`${INVENTORY_API}/inventory`, { heroId, gold: 100 * (i + 1) }))
+            axios.post(`${HERO_API}/heroes`, { userId })
+                .then((res) => {
+                    const heroId = res.data.heroId;
+                    heroes.push({ heroId, expectedXP, expectedGold, goldDelta });
+                    return axios.post(`${INVENTORY_API}/inventory`, { heroId, gold: initialGold });
+                })
         );
     }
     
@@ -193,8 +204,8 @@ async function testMultipleHeroes() {
     // Send messages to all heroes via queues
     console.log(`\n📍 Test: Send queue messages to ${heroCount} heroes concurrently`);
     for (let i = 0; i < heroCount; i++) {
-        await sendToQueue('hero_queue', { action: 'add_xp', heroId: heroes[i], xp: (i + 1) * 100 });
-        await sendToQueue('inventory_queue', { action: 'add_gold', heroId: heroes[i], gold: (i + 1) * 50 });
+        await sendToQueue('hero_queue', { action: 'add_xp', heroId: heroes[i].heroId, xp: heroes[i].expectedXP });
+        await sendToQueue('inventory_queue', { action: 'add_gold', heroId: heroes[i].heroId, gold: heroes[i].goldDelta });
     }
     
     await sleep(2000);
@@ -202,11 +213,11 @@ async function testMultipleHeroes() {
     // Verify all heroes received their updates
     let allCorrect = true;
     for (let i = 0; i < heroCount; i++) {
-        const stats = (await axios.get(`${HERO_API}/heroes/${heroes[i]}`)).data;
-        const inventory = (await axios.get(`${INVENTORY_API}/inventory/${heroes[i]}`)).data;
+        const stats = (await axios.get(`${HERO_API}/heroes/${heroes[i].heroId}`)).data;
+        const inventory = (await axios.get(`${INVENTORY_API}/inventory/${heroes[i].heroId}`)).data;
         
-        const expectedXP = (i + 1) * 100;
-        const expectedGold = 100 * (i + 1) + (i + 1) * 50;
+        const expectedXP = heroes[i].expectedXP;
+        const expectedGold = heroes[i].expectedGold;
         
         if (stats.xp !== expectedXP || inventory.gold !== expectedGold) {
             allCorrect = false;
@@ -221,11 +232,14 @@ async function testLogging() {
     console.log('\n🧪 TEST SUITE: Log Service via RabbitMQ');
     console.log('='.repeat(60));
     
-    const heroId = randomUUID();
+    const userId = randomUUID();
+    let heroId = null;
+    const magicWandId = randomUUID();
     
     try {
         // Create hero and inventory
-        await axios.post(`${HERO_API}/heroes`, { userId: heroId });
+        const createRes = await axios.post(`${HERO_API}/heroes`, { userId });
+        heroId = createRes.data.heroId;
         await axios.post(`${INVENTORY_API}/inventory`, { heroId, gold: 50 });
         await sleep(500);
     
@@ -234,7 +248,7 @@ async function testLogging() {
     await sendToQueue('hero_queue', { action: 'add_xp', heroId, xp: 100 });
     await sendToQueue('hero_queue', { action: 'update_stats', heroId, stats: { att: 25 } });
     await sendToQueue('inventory_queue', { action: 'add_gold', heroId, gold: 75 });
-    await sendToQueue('inventory_queue', { action: 'add_item', heroId, artifact: { artifactId: 'magic-wand', quantity: 1 } });
+    await sendToQueue('inventory_queue', { action: 'add_item', heroId, artifact: { artifactId: magicWandId, quantity: 1 } });
     
     await sleep(2000);
     
@@ -242,7 +256,7 @@ async function testLogging() {
     try {
         const logsRes = await axios.get(`${LOG_API}/logs`);
         const allLogs = Array.isArray(logsRes.data) ? logsRes.data : logsRes.data.logs || [];
-        const heroLogs = allLogs.filter(log => log.user_id === heroId);
+        const heroLogs = allLogs.filter(log => log.user_id === userId || log.payload?.hero_id === heroId);
         
         logTest('Logs created for all actions', heroLogs.length >= 6, `Found ${heroLogs.length} logs`);
         
@@ -252,7 +266,7 @@ async function testLogging() {
             const hasXP = eventTypes.includes('xp_added');
             const hasStats = eventTypes.includes('stats_updated');
             const hasGold = eventTypes.includes('gold_added');
-            const hasItem = eventTypes.includes('item_added');
+            const hasItem = eventTypes.includes('item_added') || eventTypes.includes('artifact_added');
             
             logTest('All event types logged', hasCreated && hasXP && hasStats && hasGold && hasItem,
                 `Events: ${eventTypes.join(', ')}`);
@@ -272,11 +286,13 @@ async function testDungeonIntegration() {
     console.log('\n🧪 TEST SUITE: Dungeon Service Integration');
     console.log('='.repeat(60));
     
-    const heroId = randomUUID();
+    const userId = randomUUID();
+    let heroId = null;
     
     try {
         // Create hero
-        await axios.post(`${HERO_API}/heroes`, { userId: heroId });
+        const createRes = await axios.post(`${HERO_API}/heroes`, { userId });
+        heroId = createRes.data.heroId;
         await sleep(1000);
     
     // Test 1: Start dungeon run
@@ -318,7 +334,8 @@ async function testEdgeCases() {
     console.log('\n🧪 TEST SUITE: Edge Cases & Error Handling');
     console.log('='.repeat(60));
     
-    const heroId = randomUUID();
+    const userId = randomUUID();
+    let heroId = null;
     
     // Test 1: Send message for non-existent hero
     console.log('\n📍 Test: Queue messages for non-existent hero');
@@ -329,7 +346,8 @@ async function testEdgeCases() {
     
     // Test 2: Invalid action in queue
     console.log('\n📍 Test: Invalid actions in queues');
-    await axios.post(`${HERO_API}/heroes`, { userId: heroId });
+    const createRes = await axios.post(`${HERO_API}/heroes`, { userId });
+    heroId = createRes.data.heroId;
     await axios.post(`${INVENTORY_API}/inventory`, { heroId, gold: 100 });
     await sleep(500);
     
@@ -360,10 +378,12 @@ async function testHighLoad() {
     console.log('\n🧪 TEST SUITE: High Load & Stress Test');
     console.log('='.repeat(60));
     
-    const heroId = randomUUID();
+    const userId = randomUUID();
+    let heroId = null;
     
     // Create hero and inventory
-    await axios.post(`${HERO_API}/heroes`, { userId: heroId });
+    const createRes = await axios.post(`${HERO_API}/heroes`, { userId });
+    heroId = createRes.data.heroId;
     await axios.post(`${INVENTORY_API}/inventory`, { heroId, gold: 1000 });
     await sleep(500);
     
@@ -392,11 +412,12 @@ async function testHighLoad() {
     
     // Test 2: Burst of item additions
     console.log('\n📍 Test: Burst of 20 item additions');
+    const testItemIds = Array.from({ length: 5 }, () => randomUUID());
     for (let i = 0; i < 20; i++) {
         await sendToQueue('inventory_queue', { 
             action: 'add_item', 
             heroId, 
-            artifact: { artifactId: 'test-item-' + (i % 5), quantity: 1 } 
+            artifact: { artifactId: testItemIds[i % 5], quantity: 1 } 
         });
     }
     

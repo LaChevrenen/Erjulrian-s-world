@@ -81,18 +81,77 @@ async function startInventoryConsumer() {
             case 'get':
               // GET inventory
               const inventoryResult = await dbClient.query(
-                'SELECT gold FROM inventory_schema.Inventories WHERE hero_id = $1',
+                'SELECT gold, equipped_count FROM inventory_schema.Inventories WHERE hero_id = $1',
                 [heroId]
               );
               
               if (inventoryResult.rowCount > 0) {
                 const itemsResult = await dbClient.query(
-                  'SELECT artifact_id AS "artifactId", quantity, equipped FROM inventory_schema.InventoryItems WHERE hero_id = $1',
+                  'SELECT artifact_id AS "artifactId", quantity, equipped, upgrade_level AS "upgradeLevel" FROM inventory_schema.InventoryItems WHERE hero_id = $1',
                   [heroId]
                 );
                 console.log(`Retrieved inventory for hero ${heroId}`);
               }
               break;
+            case 'add_gold':
+              // Add gold
+              await dbClient.query(
+                'UPDATE inventory_schema.Inventories SET gold = gold + $1 WHERE hero_id = $2',
+                [request.gold || 0, heroId]
+              );
+              await sendLog(heroId, 1, 'gold_added', { hero_id: heroId, gold_added: request.gold || 0 });
+              console.log(`Added ${request.gold || 0} gold to hero ${heroId}`);
+              break;
+            case 'remove_gold':
+              // Remove gold (floor at 0)
+              await dbClient.query(
+                'UPDATE inventory_schema.Inventories SET gold = GREATEST(gold - $1, 0) WHERE hero_id = $2',
+                [request.gold || 0, heroId]
+              );
+              await sendLog(heroId, 1, 'gold_removed', { hero_id: heroId, gold_removed: request.gold || 0 });
+              console.log(`Removed ${request.gold || 0} gold from hero ${heroId}`);
+              break;
+            case 'add_item': {
+              const item = request.artifact;
+              if (!item?.artifactId) {
+                console.warn('add_item called without artifactId');
+                break;
+              }
+              const checkResult = await dbClient.query(
+                'SELECT quantity FROM inventory_schema.InventoryItems WHERE hero_id = $1 AND artifact_id = $2',
+                [heroId, item.artifactId]
+              );
+
+              if (checkResult.rowCount > 0) {
+                await dbClient.query(
+                  'UPDATE inventory_schema.InventoryItems SET quantity = quantity + $1 WHERE hero_id = $2 AND artifact_id = $3',
+                  [item.quantity || 1, heroId, item.artifactId]
+                );
+              } else {
+                await dbClient.query(
+                  'INSERT INTO inventory_schema.InventoryItems (hero_id, artifact_id, quantity, equipped) VALUES ($1, $2, $3, false)',
+                  [heroId, item.artifactId, item.quantity || 1]
+                );
+              }
+
+              await sendLog(heroId, 1, 'artifact_added', { hero_id: heroId, artifact_id: item.artifactId, quantity: item.quantity || 1 });
+              console.log(`Added artifact ${item.artifactId} (qty: ${item.quantity || 1}) to hero ${heroId}`);
+              break;
+            }
+            case 'remove_item': {
+              const item = request.artifact;
+              if (!item?.artifactId) {
+                console.warn('remove_item called without artifactId');
+                break;
+              }
+              await dbClient.query(
+                'DELETE FROM inventory_schema.InventoryItems WHERE hero_id = $1 AND artifact_id = $2',
+                [heroId, item.artifactId]
+              );
+              await sendLog(heroId, 1, 'item_removed', { hero_id: heroId, artifact_id: item.artifactId });
+              console.log(`Removed artifact ${item.artifactId} from hero ${heroId}`);
+              break;
+            }
               
             case 'update_inventory':
               // Combined inventory update - handle gold and items in one operation
@@ -204,27 +263,32 @@ app.post('/api/inventory', async (req, res) => {
     }
 
     const insertInventory = `
-      INSERT INTO inventory_schema.Inventories (hero_id, gold)
-      VALUES ($1, $2)
+      INSERT INTO inventory_schema.Inventories (hero_id, gold, equipped_count)
+      VALUES ($1, $2, $3)
       ON CONFLICT (hero_id) DO UPDATE SET gold = $2
-      RETURNING hero_id, gold
+      RETURNING hero_id, gold, equipped_count
     `;
 
-    const result = await dbClient.query(insertInventory, [heroId, Number.isInteger(gold) ? gold : 0]);
+    const result = await dbClient.query(insertInventory, [heroId, Number.isInteger(gold) ? gold : 0, 0]);
 
     if (result.rowCount === 0) {
       // If conflict occurred, fetch the existing inventory
       const existingResult = await dbClient.query(
-        'SELECT hero_id, gold FROM inventory_schema.Inventories WHERE hero_id = $1',
+        'SELECT hero_id, gold, equipped_count FROM inventory_schema.Inventories WHERE hero_id = $1',
         [heroId]
       );
-      return res.status(200).json({ heroId, gold: existingResult.rows[0]?.gold || 0, items: [] });
+      return res.status(200).json({
+        heroId,
+        gold: existingResult.rows[0]?.gold || 0,
+        equippedCount: existingResult.rows[0]?.equipped_count || 0,
+        items: []
+      });
     }
 
-    await sendLog(heroId, 1, 'inventory_created', { hero_id: heroId, gold: result.rows[0].gold });
-    await publishInventoryEvent('inventory_created', { heroId, gold: result.rows[0].gold });
+    await sendLog(heroId, 1, 'inventory_created', { hero_id: heroId, gold: result.rows[0].gold, equipped_count: result.rows[0].equipped_count });
+    await publishInventoryEvent('inventory_created', { heroId, gold: result.rows[0].gold, equippedCount: result.rows[0].equipped_count });
 
-    return res.status(201).json({ heroId, gold: result.rows[0].gold, items: [] });
+    return res.status(201).json({ heroId, gold: result.rows[0].gold, equippedCount: result.rows[0].equipped_count, items: [] });
   } catch (error) {
     console.error('Error creating inventory:', error);
     return res.status(500).json({ error: 'Failed to create inventory' });
@@ -236,7 +300,7 @@ app.get('/api/inventory/:heroId', async (req, res) => {
     const { heroId } = req.params;
 
     const inventoryResult = await dbClient.query(
-      'SELECT gold FROM inventory_schema.Inventories WHERE hero_id = $1',
+      'SELECT gold, equipped_count FROM inventory_schema.Inventories WHERE hero_id = $1',
       [heroId]
     );
 
@@ -245,12 +309,13 @@ app.get('/api/inventory/:heroId', async (req, res) => {
     }
 
     const itemsResult = await dbClient.query(
-      'SELECT artifact_id AS "artifactId", quantity, equipped FROM inventory_schema.InventoryItems WHERE hero_id = $1',
+      'SELECT artifact_id AS "artifactId", quantity, equipped, upgrade_level AS "upgradeLevel" FROM inventory_schema.InventoryItems WHERE hero_id = $1',
       [heroId]
     );
 
     return res.status(200).json({
       gold: inventoryResult.rows[0].gold,
+      equippedCount: inventoryResult.rows[0].equipped_count,
       items: itemsResult.rows
     });
   } catch (error) {
@@ -288,14 +353,25 @@ app.put('/api/inventory/:heroId', async (req, res) => {
         VALUES ($1, $2, $3, $4)
       `;
 
+      let equippedCount = 0;
+
       for (const item of items) {
+        const isEquipped = Boolean(item.equipped);
+        if (isEquipped) {
+          equippedCount += 1;
+        }
         await dbClient.query(insertItemQuery, [
           heroId,
           item.artifactId,
           Number.isInteger(item.quantity) ? item.quantity : 1,
-          Boolean(item.equipped)
+          isEquipped
         ]);
       }
+
+      await dbClient.query(
+        'UPDATE inventory_schema.Inventories SET equipped_count = $1 WHERE hero_id = $2',
+        [equippedCount, heroId]
+      );
     }
 
     await publishInventoryEvent('inventory_updated', { heroId });
@@ -326,6 +402,96 @@ app.delete('/api/inventory/:heroId', async (req, res) => {
   } catch (error) {
     console.error('Error deleting inventory:', error);
     return res.status(500).json({ error: 'Failed to delete inventory' });
+  }
+});
+
+// POST /api/inventory/:heroId/upgrade/:artifactId - Upgrade an artifact with gold
+app.post('/api/inventory/:heroId/upgrade/:artifactId', async (req, res) => {
+  try {
+    const { heroId, artifactId } = req.params;
+
+    // Get current inventory and artifact
+    const inventoryResult = await dbClient.query(
+      'SELECT gold FROM inventory_schema.Inventories WHERE hero_id = $1',
+      [heroId]
+    );
+
+    if (inventoryResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Inventory not found' });
+    }
+
+    const currentGold = inventoryResult.rows[0].gold;
+
+    // Get artifact info and current upgrade level
+    const itemResult = await dbClient.query(
+      `SELECT ii.upgrade_level, a.level as base_level, a.name
+       FROM inventory_schema.InventoryItems ii
+       JOIN game_schema.Artifacts a ON ii.artifact_id = a.id
+       WHERE ii.hero_id = $1 AND ii.artifact_id = $2`,
+      [heroId, artifactId]
+    );
+
+    if (itemResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Artifact not found in inventory' });
+    }
+
+    const { upgrade_level, base_level, name } = itemResult.rows[0];
+    const nextLevel = upgrade_level + 1;
+
+    // Calculate upgrade cost: base_level * 100 * (1 + upgrade_level)
+    const upgradeCost = base_level * 100 * (1 + upgrade_level);
+
+    if (currentGold < upgradeCost) {
+      return res.status(400).json({ 
+        error: 'Insufficient gold',
+        required: upgradeCost,
+        current: currentGold
+      });
+    }
+
+    // Maximum 10 upgrade levels
+    if (upgrade_level >= 10) {
+      return res.status(400).json({ error: 'Artifact is already at maximum upgrade level' });
+    }
+
+    // Perform upgrade
+    await dbClient.query('BEGIN');
+
+    // Deduct gold
+    await dbClient.query(
+      'UPDATE inventory_schema.Inventories SET gold = gold - $1 WHERE hero_id = $2',
+      [upgradeCost, heroId]
+    );
+
+    // Increase upgrade level
+    await dbClient.query(
+      'UPDATE inventory_schema.InventoryItems SET upgrade_level = upgrade_level + 1 WHERE hero_id = $1 AND artifact_id = $2',
+      [heroId, artifactId]
+    );
+
+    await dbClient.query('COMMIT');
+
+    await publishInventoryEvent('artifact_upgraded', { heroId, artifactId, newLevel: nextLevel });
+    await sendLog(heroId, 1, 'artifact_upgraded', { 
+      hero_id: heroId, 
+      artifact_id: artifactId,
+      artifact_name: name,
+      upgrade_level: nextLevel,
+      cost: upgradeCost
+    });
+
+    return res.status(200).json({ 
+      message: 'Artifact upgraded successfully',
+      artifact: name,
+      newUpgradeLevel: nextLevel,
+      costPaid: upgradeCost,
+      remainingGold: currentGold - upgradeCost
+    });
+
+  } catch (error) {
+    await dbClient.query('ROLLBACK');
+    console.error('Error upgrading artifact:', error);
+    return res.status(500).json({ error: 'Failed to upgrade artifact' });
   }
 });
 

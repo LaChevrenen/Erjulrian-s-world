@@ -5,14 +5,10 @@ Table HeroStats {
   xp int
 
   base_hp int
+  current_hp int
   base_att int
   base_def int
   base_regen int
-
-  artifact_slot_1 uuid
-  artifact_slot_2 uuid
-  artifact_slot_3 uuid
-  artifact_slot_4 uuid
   updated_at timestamp
 
 }

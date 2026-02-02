@@ -30,16 +30,18 @@ async function runScenario() {
     console.log('🎮 Starting Erjulrian\'s World Test Scenario\n');
     console.log('=' .repeat(60));
     
-    const heroId = randomUUID(); // Use UUID for hero_id
+    const userId = randomUUID(); // Use UUID for user_id
+    let heroId = null;
     
     try {
         // Step 1: Create Hero via REST API
         console.log('\n📍 STEP 1: Creating Hero');
         console.log('-'.repeat(60));
         const heroResponse = await axios.post(`${HERO_API}/heroes`, {
-            userId: heroId
+            userId: userId
         });
         console.log('✓ Hero created:', heroResponse.data);
+        heroId = heroResponse.data.heroId;
         await sleep(1000);
         
         // Step 2: Create Inventory via REST API
@@ -79,7 +81,7 @@ async function runScenario() {
             action: 'add_item',
             heroId: heroId,
             artifact: {
-                artifactId: 'sword-of-power',
+                artifactId: randomUUID(),
                 quantity: 1
             }
         });

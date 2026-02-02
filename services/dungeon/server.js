@@ -152,51 +152,31 @@ async function getMonsterWithLoot(monsterId) {
     };
 }
 
-async function getHeroStats(heroId) {
-    if (!channel) {
-        throw new Error('RabbitMQ channel not ready');
-    }
+function computeHeroStats(heroSnapshot, equippedArtifacts) {
+    const base = heroSnapshot?.stats || { hp: 0, att: 0, def: 0, regen: 0 };
+    const artifacts = Array.isArray(equippedArtifacts) ? equippedArtifacts : [];
 
-    const correlationId = `${heroId}-${Date.now()}-${Math.random()}`;
-    const reply = await channel.assertQueue('', { exclusive: true });
+    const bonuses = artifacts.reduce(
+        (acc, item) => {
+            acc.hp += Number(item.hp_buff) || 0;
+            acc.att += Number(item.att_buff) || 0;
+            acc.def += Number(item.def_buff) || 0;
+            acc.regen += Number(item.regen_buff) || 0;
+            return acc;
+        },
+        { hp: 0, att: 0, def: 0, regen: 0 }
+    );
 
-    return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-            reject(new Error('Hero stats request timed out'));
-        }, 5000);
-
-        channel.consume(
-            reply.queue,
-            (msg) => {
-                if (msg?.properties?.correlationId === correlationId) {
-                    clearTimeout(timeout);
-                    try {
-                        const hero = JSON.parse(msg.content.toString());
-                        resolve({
-                            heroId,
-                            level: hero.level,
-                            xp: hero.xp,
-                            stats: {
-                                hp: hero.base_hp,
-                                att: hero.base_att,
-                                def: hero.base_def,
-                                regen: hero.base_regen
-                            }
-                        });
-                    } catch (error) {
-                        reject(error);
-                    }
-                }
-            },
-            { noAck: true }
-        );
-
-        channel.sendToQueue(
-            'hero_queue',
-            Buffer.from(JSON.stringify({ action: 'get', heroId })),
-            { replyTo: reply.queue, correlationId, persistent: true }
-        );
-    });
+    return {
+        level: Number(heroSnapshot?.level) || 1,
+        xp: Number(heroSnapshot?.xp) || 0,
+        stats: {
+            hp: (Number(base.hp) || 0) + bonuses.hp,
+            att: (Number(base.att) || 0) + bonuses.att,
+            def: (Number(base.def) || 0) + bonuses.def,
+            regen: (Number(base.regen) || 0) + bonuses.regen
+        }
+    };
 }
 
 // RabbitMQ publisher setup
@@ -332,10 +312,18 @@ function buildDungeonResponse(dungeon) {
 // POST /api/dungeons/start - Start a dungeon run
 app.post('/api/dungeons/start', async (req, res) => {
     try {
-        const { heroId } = req.body;
+        const { heroId, heroStats, equippedArtifacts } = req.body;
         
         if (!heroId) {
             return res.status(400).json({ error: 'heroId is required' });
+        }
+
+        if (!heroStats || !heroStats.stats) {
+            return res.status(400).json({ error: 'heroStats is required' });
+        }
+
+        if (!Array.isArray(equippedArtifacts)) {
+            return res.status(400).json({ error: 'equippedArtifacts must be an array' });
         }
 
         const dungeonRooms = await generateDungeonStructure();
@@ -343,6 +331,8 @@ app.post('/api/dungeons/start', async (req, res) => {
 
         const dungeon = new DungeonRun({
             heroId,
+            heroSnapshot: heroStats || null,
+            equippedArtifacts: Array.isArray(equippedArtifacts) ? equippedArtifacts : [],
             startedAt: new Date(),
             status: 'in_progress',
             position: { floor: 0, room: 0 },
@@ -486,19 +476,27 @@ app.post('/api/dungeons/:runId/choose', async (req, res) => {
         // If combat room, build combat payload with monster + loot from DB
         if (['combat', 'elite-combat', 'boss'].includes(chosenRoom.type) && chosenRoom.monsterId) {
             try {
-                const [heroStats, monster] = await Promise.all([
-                    getHeroStats(dungeon.heroId),
-                    getMonsterWithLoot(chosenRoom.monsterId)
-                ]);
-
-                if (monster) {
-                    await publishEvent('combat_queue', {
-                        hero: heroStats,
-                        monster,
-                        runId: dungeon._id,
-                        room: { floor: chosenRoom.floor, room: chosenRoom.room, type: chosenRoom.type }
+                const monster = await getMonsterWithLoot(chosenRoom.monsterId);
+                if (!monster) {
+                    return res.json({
+                        position: dungeon.position,
+                        roomType: chosenRoom.type
                     });
                 }
+
+                const computedHero = computeHeroStats(dungeon.heroSnapshot, dungeon.equippedArtifacts);
+
+                await publishEvent('combat_queue', {
+                    hero: {
+                        heroId: dungeon.heroId,
+                        level: computedHero.level,
+                        xp: computedHero.xp,
+                        stats: computedHero.stats
+                    },
+                    monster,
+                    runId: dungeon._id,
+                    room: { floor: chosenRoom.floor, room: chosenRoom.room, type: chosenRoom.type }
+                });
             } catch (error) {
                 console.error('Failed to trigger combat:', error);
             }

@@ -24,6 +24,10 @@ export class UserRepositoryAdapter implements UserRepositoryPort {
     private async connect(retries = 5) {
         for (let i = 0; i < retries; i++) {
             try {
+                // Recréer le client à chaque tentative
+                if (i > 0) {
+                    this.dbClient = new Client(dbConfig);
+                }
                 await this.dbClient.connect();
                 console.log('✅ Connected to PostgreSQL database');
                 return;

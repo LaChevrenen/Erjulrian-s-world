@@ -11,7 +11,7 @@ export class UserService implements UserServicePort {
 
     JWT_EXPIRATION = '24h';
 
-    async connect(name: string): Promise<string | null> {
+    async connect(name: string): Promise<{token:string, userId: string} | null> {
         const user = await this.repo.findByName(name);
         if (!user) return null;
         const token = jwt.sign({
@@ -19,7 +19,8 @@ export class UserService implements UserServicePort {
             name: user.name,
             isAdmin: user.isAdmin
         }, this.JWT_SECRET);
-        return Promise.resolve(token);
+
+        return Promise.resolve({token, userId: user.id});
     }
 
     async create(data: createUserDTO): Promise<User | null> {

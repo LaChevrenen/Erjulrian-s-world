@@ -23,12 +23,20 @@ services:
     build: ./user
     container_name: user-api
     depends_on:
-      - rabbitmq
+      db-user:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     ports:
       - "3001:3001"
     environment:
       - NODE_ENV=development
       - PORT=3001
+      - DB_HOST=db-user
+      - DB_PORT=5432
+      - DB_USER=user_user
+      - DB_PASSWORD=user_password
+      - DB_NAME=erjulrian_user
       - RABBITMQ_URL=amqp://rabbitmq:5672
     networks:
       - erjulrian-network
@@ -202,6 +210,28 @@ services:
       start_period: 30s
     restart: always
 
+  db-user:
+    image: postgres:16-alpine
+    container_name: erjulrian-db-user
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=toto123
+      - POSTGRES_DB=erjulrian_user
+    ports:
+      - "5435:5432"
+    volumes:
+      - db-user-data:/var/lib/postgresql/data
+      - ./init-db/6-init-user.sql:/docker-entrypoint-initdb.d/6-init-user.sql
+    networks:
+      - erjulrian-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+
   mongo:
     image: mongo:latest
     container_name: erjulrian-mongo
@@ -259,6 +289,7 @@ volumes:
   db-hero-data:
   db-inventory-data:
   db-game-data:
+  db-user-data:
   mongo-data:
   redis-data:
 

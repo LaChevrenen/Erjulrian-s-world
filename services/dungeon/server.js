@@ -1,6 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const amqp = require('amqplib');
+const { Client } = require('pg');
+const axios = require('axios');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
 const cors = require('cors');
@@ -13,6 +15,15 @@ app.use(express.json());
 const PORT = process.env.PORT || 3005;
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/erjulrian_dungeon';
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
+const HERO_API_URL = process.env.HERO_API_URL || 'http://hero-service:3003/api';
+
+const dbConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
+    user: process.env.DB_USER || 'inventory_user',
+    password: process.env.DB_PASSWORD || 'inventory_password',
+    database: process.env.DB_NAME || 'erjulrian_db'
+};
 
 // Load Swagger documentation
 const swaggerDocument = YAML.load('./swagger.yaml');
@@ -27,6 +38,88 @@ async function connectMongoDB() {
         console.error('Failed to connect to MongoDB:', error);
         setTimeout(connectMongoDB, 5000);
     }
+}
+
+// PostgreSQL connection for game data
+let dbClient;
+let monsterIdCache = [];
+
+async function connectPostgres() {
+    try {
+        dbClient = new Client(dbConfig);
+        await dbClient.connect();
+        console.log('Connected to PostgreSQL (game data)');
+        await refreshMonsterCache();
+    } catch (error) {
+        console.error('Failed to connect to PostgreSQL:', error);
+        setTimeout(connectPostgres, 5000);
+    }
+}
+
+async function refreshMonsterCache() {
+    if (!dbClient) return;
+    try {
+        const result = await dbClient.query('SELECT id FROM game_schema.Monsters');
+        monsterIdCache = result.rows.map(row => row.id);
+    } catch (error) {
+        console.error('Failed to refresh monster cache:', error);
+    }
+}
+
+function pickRandomMonsterId() {
+    if (!monsterIdCache.length) return null;
+    const idx = Math.floor(Math.random() * monsterIdCache.length);
+    return monsterIdCache[idx];
+}
+
+async function getMonsterWithLoot(monsterId) {
+    if (!dbClient || !monsterId) return null;
+    const monsterResult = await dbClient.query(
+        'SELECT id, name, type, description, hp, att, def, regen FROM game_schema.Monsters WHERE id = $1',
+        [monsterId]
+    );
+
+    if (monsterResult.rowCount === 0) return null;
+
+    const lootResult = await dbClient.query(
+        'SELECT artifact_id AS "artifactId", chance, amount FROM game_schema.MonsterLoot WHERE monster_id = $1',
+        [monsterId]
+    );
+
+    const monster = monsterResult.rows[0];
+    return {
+        id: monster.id,
+        name: monster.name,
+        type: monster.type,
+        description: monster.description,
+        stats: {
+            hp: monster.hp,
+            att: monster.att,
+            def: monster.def,
+            regen: monster.regen
+        },
+        lootTable: lootResult.rows.map(l => ({
+            artifactId: l.artifactId,
+            chance: l.chance,
+            amount: l.amount
+        }))
+    };
+}
+
+async function getHeroStats(heroId) {
+    const response = await axios.get(`${HERO_API_URL}/heroes/${heroId}`);
+    const hero = response.data;
+    return {
+        heroId,
+        level: hero.level,
+        xp: hero.xp,
+        stats: {
+            hp: hero.base_hp,
+            att: hero.base_att,
+            def: hero.base_def,
+            regen: hero.base_regen
+        }
+    };
 }
 
 // RabbitMQ publisher setup
@@ -62,21 +155,28 @@ function getRandomRoomType() {
 }
 
 // Helper function to generate dungeon structure (3 floors x 5 rooms)
-function generateDungeonStructure() {
+async function generateDungeonStructure() {
+    if (!monsterIdCache.length) {
+        await refreshMonsterCache();
+    }
+
     const rooms = [];
     for (let floor = 0; floor < 3; floor++) {
         for (let room = 0; room < 5; room++) {
+            const type = getRandomRoomType();
+            const monsterId = type === 'rest' ? null : pickRandomMonsterId();
             rooms.push({
                 floor,
                 room,
-                type: getRandomRoomType(),
-                monsterId: null,
+                type,
+                monsterId,
                 visited: false
             });
         }
     }
     rooms[0].type = 'rest'; // First room is always rest (safe)
     rooms[0].visited = true;
+    rooms[0].monsterId = null;
     return rooms;
 }
 
@@ -151,7 +251,7 @@ app.post('/api/dungeons/start', async (req, res) => {
             return res.status(400).json({ error: 'heroId is required' });
         }
 
-        const dungeonRooms = generateDungeonStructure();
+        const dungeonRooms = await generateDungeonStructure();
         const startingRoom = dungeonRooms[0];
 
         const dungeon = new DungeonRun({
@@ -289,8 +389,30 @@ app.post('/api/dungeons/:runId/choose', async (req, res) => {
             heroId: dungeon.heroId,
             position: dungeon.position,
             roomType: chosenRoom.type,
+            monsterId: chosenRoom.monsterId || null,
             timestamp: new Date()
         });
+
+        // If combat room, build combat payload with monster + loot from DB
+        if (['combat', 'elite-combat', 'boss'].includes(chosenRoom.type) && chosenRoom.monsterId) {
+            try {
+                const [heroStats, monster] = await Promise.all([
+                    getHeroStats(dungeon.heroId),
+                    getMonsterWithLoot(chosenRoom.monsterId)
+                ]);
+
+                if (monster) {
+                    await publishEvent('combat_queue', {
+                        hero: heroStats,
+                        monster,
+                        runId: dungeon._id,
+                        room: { floor: chosenRoom.floor, room: chosenRoom.room, type: chosenRoom.type }
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to trigger combat:', error);
+            }
+        }
 
         res.json({
             position: dungeon.position,
@@ -350,6 +472,7 @@ app.get('/health', (req, res) => {
 // Start server
 async function start() {
     await connectMongoDB();
+    await connectPostgres();
     await setupRabbitMQ();
     
     app.listen(PORT, () => {

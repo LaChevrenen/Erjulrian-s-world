@@ -80,6 +80,8 @@ components:
       properties:
         gold:
           type: integer
+        equippedCount:
+          type: integer
         items:
           type: array
           items:
@@ -96,6 +98,8 @@ components:
           type: integer
         equipped:
           type: boolean
+        upgradeLevel:
+          type: integer
 
     CreateInventoryRequest:
       type: object

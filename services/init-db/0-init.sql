@@ -82,10 +82,6 @@ CREATE TABLE hero_schema.HeroStats (
   base_att INT DEFAULT 4,
   base_def INT DEFAULT 1,
   base_regen INT DEFAULT 1,
-  artifact_slot_1 UUID REFERENCES game_schema.Artifacts(id),
-  artifact_slot_2 UUID REFERENCES game_schema.Artifacts(id),
-  artifact_slot_3 UUID REFERENCES game_schema.Artifacts(id),
-  artifact_slot_4 UUID REFERENCES game_schema.Artifacts(id),
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -117,7 +113,7 @@ CREATE SCHEMA inventory_schema AUTHORIZATION admin;
 CREATE TABLE inventory_schema.Inventories (
   hero_id UUID PRIMARY KEY,
   gold int,
-  FOREIGN KEY (hero_id) REFERENCES hero_schema.HeroStats(hero_id) ON DELETE CASCADE
+  equipped_count int DEFAULT 0
 );
 
 CREATE TABLE inventory_schema.InventoryItems (
@@ -125,9 +121,8 @@ CREATE TABLE inventory_schema.InventoryItems (
   artifact_id UUID,
   quantity int,
   equipped boolean,
-  PRIMARY KEY (hero_id, artifact_id),
-  FOREIGN KEY (hero_id) REFERENCES inventory_schema.Inventories(hero_id) ON DELETE CASCADE,
-  FOREIGN KEY (artifact_id) REFERENCES game_schema.Artifacts(id)
+  upgrade_level int DEFAULT 0,
+  PRIMARY KEY (hero_id, artifact_id)
 );
 
 -- ###########################################

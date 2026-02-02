@@ -71,20 +71,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HeroStats'
-    put:
-      tags: [Heroes]
-      summary: Update hero stats
-      parameters:
-        - $ref: '#/components/parameters/HeroId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateHeroRequest'
-      responses:
-        200:
-          description: Hero updated
     delete:
       tags: [Heroes]
       summary: Delete a hero
@@ -93,22 +79,6 @@ paths:
       responses:
         204:
           description: Hero deleted
-
-  /heroes/{heroId}/xp:
-    post:
-      tags: [Heroes]
-      summary: Add XP to hero
-      parameters:
-        - $ref: '#/components/parameters/HeroId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AddXpRequest'
-      responses:
-        200:
-          description: XP added and level calculated
 
 components:
 
@@ -130,33 +100,6 @@ components:
           type: string
           format: uuid
 
-    UpdateHeroRequest:
-      type: object
-      properties:
-        level:
-          type: integer
-        xp:
-          type: integer
-        base_hp:
-          type: integer
-        base_att:
-          type: integer
-        base_def:
-          type: integer
-        base_regen:
-          type: integer
-        artifact_slot_1:
-          type: string
-          format: uuid
-        artifact_slot_2:
-          type: string
-          format: uuid
-        artifact_slot_3:
-          type: string
-          format: uuid
-        artifact_slot_4:
-          type: string
-          format: uuid
 
     HeroStats:
       type: object
@@ -173,30 +116,15 @@ components:
           type: integer
         base_hp:
           type: integer
+        current_hp:
+          type: integer
         base_att:
           type: integer
         base_def:
           type: integer
         base_regen:
           type: integer
-        artifact_slot_1:
-          type: string
-          format: uuid
-        artifact_slot_2:
-          type: string
-          format: uuid
-        artifact_slot_3:
-          type: string
-          format: uuid
-        artifact_slot_4:
-          type: string
-          format: uuid
         updated_at:
           type: string
           format: date-time
 
-    AddXpRequest:
-      type: object
-      properties:
-        xp:
-          type: integer

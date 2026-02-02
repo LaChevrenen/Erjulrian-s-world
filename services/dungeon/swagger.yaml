@@ -101,6 +101,12 @@ components:
       properties:
         heroId:
           type: string
+        heroStats:
+          $ref: '#/components/schemas/HeroStatsSnapshot'
+        equippedArtifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/EquippedArtifact'
 
     DungeonRun:
       type: object
@@ -157,6 +163,39 @@ components:
             $ref: '#/components/schemas/RoomChoice'
           minItems: 0
           maxItems: 2
+
+    HeroStatsSnapshot:
+      type: object
+      properties:
+        level:
+          type: integer
+        xp:
+          type: integer
+        stats:
+          type: object
+          properties:
+            hp:
+              type: integer
+            att:
+              type: integer
+            def:
+              type: integer
+            regen:
+              type: integer
+
+    EquippedArtifact:
+      type: object
+      properties:
+        id:
+          type: string
+        hp_buff:
+          type: integer
+        att_buff:
+          type: integer
+        def_buff:
+          type: integer
+        regen_buff:
+          type: integer
 
     ChooseRoomRequest:
       type: object

@@ -443,7 +443,7 @@ async function testDungeonServiceREST() {
         
         // Test 2: Get run state
         const getRes = await axios.get(`${DUNGEON_API}/${runId}`);
-        logTest('Get dungeon run state', getRes.status === 200 && getRes.data.currentFloor !== undefined);
+        logTest('Get dungeon run state', getRes.status === 200 && getRes.data.position?.floor !== undefined);
         
         // Test 3: Get choices
         const choicesRes = await axios.get(`${DUNGEON_API}/${runId}/choices`);
@@ -500,15 +500,20 @@ async function testGameDataLinkage() {
             }
         }
 
-        // Validate dungeon rooms reference monsters in DB
-        const heroCreate = await axios.post(`${HERO_API}/heroes`, { userId: randomUUID() });
-        const heroId = heroCreate.data.heroId;
-        const startRes = await axios.post(`${DUNGEON_API}/start`, { heroId });
+        // Validate dungeon rooms reference monsters in DB (retry a few runs for randomness)
+        let roomMonsterIds = [];
+        for (let i = 0; i < 3; i++) {
+            const heroCreate = await axios.post(`${HERO_API}/heroes`, { userId: randomUUID() });
+            const heroId = heroCreate.data.heroId;
+            const startRes = await axios.post(`${DUNGEON_API}/start`, { heroId });
 
-        const rooms = startRes.data?.rooms || [];
-        const roomMonsterIds = [...new Set(rooms
-            .filter(r => ['combat', 'elite-combat', 'boss'].includes(r.type) && r.monsterId)
-            .map(r => r.monsterId))];
+            const rooms = startRes.data?.rooms || [];
+            roomMonsterIds = [...new Set(rooms
+                .filter(r => ['combat', 'elite-combat', 'boss'].includes(r.type) && r.monsterId)
+                .map(r => r.monsterId))];
+
+            if (roomMonsterIds.length > 0) break;
+        }
 
         if (roomMonsterIds.length > 0) {
             const roomMonsterRes = await client.query(
@@ -518,7 +523,7 @@ async function testGameDataLinkage() {
             logTest('Dungeon room monsters exist in DB', roomMonsterRes.rows[0]?.count === roomMonsterIds.length,
                 `Found: ${roomMonsterRes.rows[0]?.count}/${roomMonsterIds.length}`);
         } else {
-            logTest('Dungeon rooms include monsters', false, 'No combat rooms with monsterId');
+            logTest('Dungeon rooms include monsters', false, 'No combat rooms with monsterId after retries');
         }
     } catch (error) {
         logTest('Game data linkage tests', false, '', error.message);

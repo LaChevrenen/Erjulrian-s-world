@@ -80,7 +80,7 @@ async function startHeroConsumer() {
                     const { action, heroId, xp, hp, stats } = request;
                     
                     switch (action) {
-                        case 'get':
+                        case 'get': {
                             // GET hero stats (reply-to support)
                             const heroResult = await dbClient.query(
                                 'SELECT * FROM hero_schema.HeroStats WHERE hero_id = $1',
@@ -100,65 +100,48 @@ async function startHeroConsumer() {
                                 );
                             }
                             break;
-                            
-                        case 'update_hero':
-                            // Combined hero update - handle XP and HP in one operation
+                        }
+                        case 'update_hero': {
+                            // Combined hero update - handle XP and HP in one operation (atomic)
                             const xpDelta = request.xpDelta || 0;
                             const hpDelta = request.hpDelta || 0;
-                            
-                            const currentHeroResult = await dbClient.query(
-                                'SELECT * FROM hero_schema.HeroStats WHERE hero_id = $1',
-                                [heroId]
+
+                            const updateResult = await dbClient.query(
+                                `UPDATE hero_schema.HeroStats
+                                 SET xp = GREATEST(xp + $1, 0),
+                                     level = (FLOOR(SQRT(GREATEST(xp + $1, 0) / 100.0)) + 1)::int,
+                                     base_hp = GREATEST(base_hp + $2, 0),
+                                     updated_at = NOW()
+                                 WHERE hero_id = $3
+                                 RETURNING *`,
+                                [xpDelta, hpDelta, heroId]
                             );
-                            
-                            if (currentHeroResult.rowCount === 0) {
+
+                            if (updateResult.rowCount === 0) {
                                 console.warn(`Hero ${heroId} not found`);
                                 break;
                             }
-                            
-                            const currentHero = currentHeroResult.rows[0];
-                            let updateQueries = [];
-                            let newLevel = currentHero.level;
-                            let newXp = currentHero.xp;
-                            let newHp = currentHero.base_hp;
-                            
-                            // Handle XP update
-                            if (xpDelta !== 0) {
-                                newXp = currentHero.xp + xpDelta;
-                                newLevel = calculateLevel(newXp);
-                                
-                                await dbClient.query(
-                                    'UPDATE hero_schema.HeroStats SET xp = $1, level = $2, updated_at = NOW() WHERE hero_id = $3',
-                                    [newXp, newLevel, heroId]
-                                );
-                                
-                                if (xpDelta > 0) {
-                                    await sendLog(heroId, 1, 'xp_added', { hero_id: heroId, xp_added: xpDelta, new_level: newLevel });
-                                    console.log(`Added ${xpDelta} XP to hero ${heroId}, new level: ${newLevel}`);
-                                }
+
+                            const updatedHero = updateResult.rows[0];
+
+                            if (xpDelta > 0) {
+                                await sendLog(heroId, 1, 'xp_added', { hero_id: heroId, xp_added: xpDelta, new_level: updatedHero.level });
+                                console.log(`Added ${xpDelta} XP to hero ${heroId}, new level: ${updatedHero.level}`);
                             }
-                            
-                            // Handle HP update
+
                             if (hpDelta !== 0) {
-                                newHp = Math.max(0, currentHero.base_hp + hpDelta);
-                                
-                                await dbClient.query(
-                                    'UPDATE hero_schema.HeroStats SET base_hp = $1, updated_at = NOW() WHERE hero_id = $2',
-                                    [newHp, heroId]
-                                );
-                                
                                 if (hpDelta > 0) {
-                                    await sendLog(heroId, 1, 'hp_healed', { hero_id: heroId, hp_restored: hpDelta, new_hp: newHp });
-                                    console.log(`Healed ${hpDelta} HP to hero ${heroId}, new HP: ${newHp}`);
+                                    await sendLog(heroId, 1, 'hp_healed', { hero_id: heroId, hp_healed: hpDelta });
+                                    console.log(`Healed ${hpDelta} HP for hero ${heroId}`);
                                 } else {
-                                    await sendLog(heroId, 1, 'hp_lost', { hero_id: heroId, hp_lost: Math.abs(hpDelta), new_hp: newHp });
-                                    console.log(`Hero ${heroId} lost ${Math.abs(hpDelta)} HP, remaining: ${newHp}`);
+                                    await sendLog(heroId, 1, 'hp_lost', { hero_id: heroId, hp_lost: Math.abs(hpDelta) });
+                                    console.log(`Lost ${Math.abs(hpDelta)} HP for hero ${heroId}`);
                                 }
                             }
-                            
+
                             console.log(`Updated hero ${heroId}: xp=${xpDelta}, hp=${hpDelta}`);
                             break;
-                            
+                        }
                         default:
                             console.warn(`Unknown action: ${action}`);
                     }
@@ -219,6 +202,10 @@ function calculateLevel(xp) {
 
 // REST API Endpoints
 
+function isUuid(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 // POST /api/heroes - Create a new hero
 app.post('/api/heroes', async (req, res) => {
     try {
@@ -266,6 +253,9 @@ app.post('/api/heroes', async (req, res) => {
 app.get('/api/heroes/:heroId', async (req, res) => {
     try {
         const { heroId } = req.params;
+        if (!isUuid(heroId)) {
+            return res.status(400).json({ error: 'Invalid heroId format' });
+        }
         const query = 'SELECT * FROM hero_schema.HeroStats WHERE hero_id = $1';
         const result = await dbClient.query(query, [heroId]);
         

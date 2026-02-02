@@ -1,6 +1,7 @@
 -- Create the user for each services
 CREATE USER inventory_user WITH PASSWORD 'inventory_password';
 CREATE USER hero_user WITH PASSWORD 'hero_password';
+CREATE USER user_user WITH PASSWORD 'user_password';
 
 -- ###########################################
 -- REVOKE DEFAULT ACCESS
@@ -87,5 +88,31 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA hero_schema TO hero
 -- Set visibility on sequences
 ALTER ROLE admin SET search_path TO hero_schema, public;
 ALTER ROLE hero_user SET search_path TO hero_schema, public;
+
+-- ###########################################
+
+-- ###########################################
+-- USER SERVICE SCHEMA
+-- ###########################################
+
+CREATE SCHEMA user_schema AUTHORIZATION admin;
+
+-- ###########################################
+-- USER SERVICE TABLES
+-- ###########################################
+
+CREATE TABLE user_schema.Users (
+  id UUID PRIMARY KEY,
+  username VARCHAR(255)
+);
+
+GRANT USAGE, CREATE ON SCHEMA user_schema TO user_user;
+GRANT USAGE ON SCHEMA user_schema TO user_user;
+
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA user_schema TO admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA user_schema TO user_user;
+
+ALTER ROLE admin SET search_path TO user_schema, public;
+ALTER ROLE user_user SET search_path TO user_schema, public;
 
 -- ###########################################

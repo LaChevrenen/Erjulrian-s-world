@@ -2,16 +2,14 @@ const amqp = require('amqplib');
 const axios = require('axios');
 const { Client } = require('pg');
 const { randomUUID } = require('crypto');
-const artifacts = require('./data/artifacts.json');
 
-const [
-    ARTIFACT_A,
-    ARTIFACT_B,
-    ARTIFACT_C,
-    ARTIFACT_D,
-    ARTIFACT_E,
-    ARTIFACT_F
-] = artifacts.map(a => a.id);
+// Artifact IDs from database (seeded via SQL migrations)
+const ARTIFACT_A = '550e8400-e29b-41d4-a716-446655440501';
+const ARTIFACT_B = '550e8400-e29b-41d4-a716-446655440502';
+const ARTIFACT_C = '550e8400-e29b-41d4-a716-446655440503';
+const ARTIFACT_D = '550e8400-e29b-41d4-a716-446655440504';
+const ARTIFACT_E = '550e8400-e29b-41d4-a716-446655440505';
+const ARTIFACT_F = '550e8400-e29b-41d4-a716-446655440506';
 
 const RABBITMQ_URL = 'amqp://localhost:5672';
 const HERO_API = 'http://localhost:3003/api';

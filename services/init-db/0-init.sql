@@ -2,6 +2,7 @@
 CREATE USER inventory_user WITH PASSWORD 'inventory_password';
 CREATE USER hero_user WITH PASSWORD 'hero_password';
 CREATE USER user_user WITH PASSWORD 'user_password';
+CREATE USER dungeon_user WITH PASSWORD 'dungeon_password';
 
 -- ###########################################
 -- REVOKE DEFAULT ACCESS
@@ -9,14 +10,13 @@ CREATE USER user_user WITH PASSWORD 'user_password';
 
 -- Make sure every user accessing the DB has no default access to public schema
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
-GRANT ALL ON SCHEMA public TO admin;
 
 -- ###########################################
 -- GAME DATA SCHEMA (ARTIFACTS & MONSTERS)
 -- ###########################################
 
 -- Creation of the schema for game data
-CREATE SCHEMA game_schema AUTHORIZATION admin;
+CREATE SCHEMA IF NOT EXISTS game_schema;
 
 -- Artifacts table
 CREATE TABLE game_schema.Artifacts (
@@ -52,20 +52,22 @@ CREATE TABLE game_schema.MonsterLoot (
 );
 
 -- ###########################################
--- GAME DATA PERMISSIONS
+-- GAME DATA PERMISSIONS (READ-ONLY for dungeon)
 -- ###########################################
 
 GRANT USAGE ON SCHEMA game_schema TO inventory_user;
 GRANT USAGE ON SCHEMA game_schema TO hero_user;
+GRANT USAGE ON SCHEMA game_schema TO dungeon_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA game_schema TO inventory_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA game_schema TO hero_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA game_schema TO dungeon_user;
 
 -- ###########################################
 -- HERO SERVICE SCHEMA (doit être créé AVANT inventory)
 -- ###########################################
 
 -- Creation of the schema for hero service
-CREATE SCHEMA hero_schema AUTHORIZATION admin;
+CREATE SCHEMA IF NOT EXISTS hero_schema;
 
 -- ###########################################
 -- HERO SERVICE TABLES
@@ -88,16 +90,14 @@ CREATE TABLE hero_schema.HeroStats (
 CREATE INDEX idx_hero_user_id ON hero_schema.HeroStats(user_id);
 
 -- ###########################################
--- HERO SERVICE PERMISSIONS
+-- HERO SERVICE PERMISSIONS (RESTRICTIVE)
 -- ###########################################
 
 -- Set permissions for hero service user on hero schema
-GRANT USAGE, CREATE ON SCHEMA hero_schema TO hero_user;
 GRANT USAGE ON SCHEMA hero_schema TO hero_user;
 
--- Set permissions on tables
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA hero_schema TO admin;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA hero_schema TO hero_user;
+-- Set permissions on tables - SELECT, INSERT, UPDATE only (NO DELETE)
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA hero_schema TO hero_user;
 
 -- Set visibility on sequences
 ALTER ROLE admin SET search_path TO hero_schema, public;
@@ -108,7 +108,7 @@ ALTER ROLE hero_user SET search_path TO hero_schema, public;
 -- ###########################################
 
 -- Creation of the schema for inventory service
-CREATE SCHEMA inventory_schema AUTHORIZATION admin;
+CREATE SCHEMA IF NOT EXISTS inventory_schema;
 
 CREATE TABLE inventory_schema.Inventories (
   hero_id UUID PRIMARY KEY,
@@ -126,16 +126,14 @@ CREATE TABLE inventory_schema.InventoryItems (
 );
 
 -- ###########################################
--- INVENTORY SERVICE PERMISSIONS
+-- INVENTORY SERVICE PERMISSIONS (RESTRICTIVE)
 -- ###########################################
 
 -- Set permissions for inventory service user on inventory schema
-GRANT USAGE, CREATE ON SCHEMA inventory_schema TO inventory_user;
 GRANT USAGE ON SCHEMA inventory_schema TO inventory_user;
 
--- Set permissions on tables
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA inventory_schema TO admin;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA inventory_schema TO inventory_user;
+-- Set permissions on tables - SELECT, INSERT, UPDATE only (NO DELETE)
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA inventory_schema TO inventory_user;
 
 -- Set visibility on sequences
 ALTER ROLE admin SET search_path TO inventory_schema, public;
@@ -147,7 +145,7 @@ ALTER ROLE inventory_user SET search_path TO inventory_schema, public;
 -- USER SERVICE SCHEMA
 -- ###########################################
 
-CREATE SCHEMA user_schema AUTHORIZATION admin;
+CREATE SCHEMA IF NOT EXISTS user_schema;
 
 -- ###########################################
 -- USER SERVICE TABLES
@@ -167,5 +165,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA user_schema TO user
 
 ALTER ROLE admin SET search_path TO user_schema, public;
 ALTER ROLE user_user SET search_path TO user_schema, public;
+
+-- ###########################################
+-- DUNGEON SERVICE PERMISSIONS (READ-ONLY on game_schema)
+-- ###########################################
+
+-- Dungeon service can ONLY read game_schema (monsters data)
+-- Already granted above in GAME DATA PERMISSIONS section
 
 -- ###########################################

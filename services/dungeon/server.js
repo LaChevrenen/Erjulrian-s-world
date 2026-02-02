@@ -20,8 +20,8 @@ const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
-    user: process.env.DB_USER || 'inventory_user',
-    password: process.env.DB_PASSWORD || 'inventory_password',
+    user: process.env.DB_USER || 'dungeon_user',
+    password: process.env.DB_PASSWORD || 'dungeon_password',
     database: process.env.DB_NAME || 'erjulrian_db'
 };
 
@@ -187,6 +187,9 @@ async function setupRabbitMQ() {
         const connection = await amqp.connect(RABBITMQ_URL);
         channel = await connection.createChannel();
         console.log('Connected to RabbitMQ');
+        
+        // Start consuming combat results
+        startCombatResultConsumer();
     } catch (error) {
         console.error('Failed to connect to RabbitMQ:', error);
         setTimeout(setupRabbitMQ, 5000);
@@ -202,6 +205,69 @@ async function publishEvent(queue, message) {
         } catch (error) {
             console.error(`Failed to publish event to ${queue}:`, error);
         }
+    }
+}
+
+// Combat result consumer - updates dungeon hero snapshot with damage taken
+async function startCombatResultConsumer() {
+    if (!channel) {
+        console.error('Cannot start combat result consumer: channel is null');
+        return;
+    }
+
+    try {
+        console.log('Starting combat result consumer...');
+        const resultQueue = 'combat_result_queue';
+        await channel.assertQueue(resultQueue, { durable: true });
+
+        channel.consume(resultQueue, async (msg) => {
+            if (msg !== null) {
+                try {
+                    const battleResult = JSON.parse(msg.content.toString());
+                    console.log('Combat result received:', battleResult);
+
+                    const runId = battleResult.runId;
+                    const heroId = battleResult.hero?.heroId;
+                    const damageDealt = battleResult.damageDealt || 0;
+
+                    if (!runId || !heroId) {
+                        console.warn('Combat result missing runId or heroId');
+                        channel.ack(msg);
+                        return;
+                    }
+
+                    // Find dungeon run and update hero snapshot HP
+                    const dungeon = await DungeonRun.findById(runId);
+                    if (!dungeon) {
+                        console.warn(`Dungeon run ${runId} not found`);
+                        channel.ack(msg);
+                        return;
+                    }
+
+                    // Apply damage to current_hp
+                    if (dungeon.heroSnapshot && dungeon.heroSnapshot.stats) {
+                        const newHp = Math.max(0, (dungeon.heroSnapshot.stats.current_hp || dungeon.heroSnapshot.stats.hp) - damageDealt);
+                        dungeon.heroSnapshot.stats.current_hp = newHp;
+                        
+                        console.log(`Updated hero ${heroId} HP in dungeon ${runId}: -${damageDealt} HP (new: ${newHp})`);
+                        
+                        await dungeon.save();
+                        
+                        // Invalidate cache
+                        await clearCachedDungeon(runId);
+                    }
+
+                    channel.ack(msg);
+                } catch (error) {
+                    console.error('Error processing combat result:', error);
+                    channel.ack(msg);
+                }
+            }
+        });
+
+        console.log('Combat result consumer started');
+    } catch (error) {
+        console.error('Failed to start combat result consumer:', error);
     }
 }
 

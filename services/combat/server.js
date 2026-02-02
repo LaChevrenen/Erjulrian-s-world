@@ -59,6 +59,7 @@ async function start() {
         }
         const heroId = combatData.hero.heroId;
         const monsterName = combatData.monster.name;
+        const runId = combatData.runId;
         
         console.log("Combat reçu :", combatData);
         await sendLog(heroId, 'info', 'combat_start', { monsterName, monsterType: combatData.monster.type });
@@ -67,6 +68,8 @@ async function start() {
         let battleResult;
         try {
             battleResult = computeBattle(combatData);
+            // Add runId to result for dungeon tracking
+            battleResult.runId = runId;
         } catch (error) {
             console.error("Unable to process combat data:", error);
             await sendLog(heroId, 'error', 'combat_error', { error: error.message });
@@ -265,6 +268,8 @@ function computeBattle(combatData)
     
     battleJson.heroId = combatData.hero.heroId;
     battleJson.hpDelta = Math.max(0, heroHp);
+    // Calculate total damage dealt to hero (original HP - remaining HP)
+    battleJson.damageDealt = Math.max(0, heroMaxHp - heroHp);
 
     return battleJson;
 }

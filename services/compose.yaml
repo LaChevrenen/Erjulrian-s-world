@@ -4,10 +4,7 @@ services:
     build: ./gateway
     container_name: gateway-api
     depends_on:
-      db:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_started
+      - rabbitmq
     ports:
       - "3000:3000"
     environment:
@@ -26,20 +23,12 @@ services:
     build: ./user
     container_name: user-api
     depends_on:
-      db:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_started
+      - rabbitmq
     ports:
       - "3001:3001"
     environment:
       - NODE_ENV=development
       - PORT=3001
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_USER=user_user
-      - DB_PASSWORD=user_password
-      - DB_NAME=erjulrian_db
       - RABBITMQ_URL=amqp://rabbitmq:5672
     networks:
       - erjulrian-network
@@ -81,18 +70,20 @@ services:
     build: ./hero
     container_name: hero-api
     depends_on:
-      - db
-      - rabbitmq
+      db-hero:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     ports:
       - "3003:3003"
     environment:
       - NODE_ENV=development
       - PORT=3003
-      - DB_HOST=db
+      - DB_HOST=db-hero
       - DB_PORT=5432
       - DB_USER=hero_user
       - DB_PASSWORD=hero_password
-      - DB_NAME=erjulrian_db
+      - DB_NAME=erjulrian_hero
       - RABBITMQ_URL=amqp://rabbitmq:5672
     networks:
       - erjulrian-network
@@ -102,18 +93,20 @@ services:
     build: ./inventory
     container_name: inventory-api
     depends_on:
-      - db
-      - rabbitmq
+      db-inventory:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     ports:
       - "3004:3004"
     environment:
       - NODE_ENV=development
       - PORT=3004
-      - DB_HOST=db
+      - DB_HOST=db-inventory
       - DB_PORT=5432
       - DB_USER=inventory_user
       - DB_PASSWORD=inventory_password
-      - DB_NAME=erjulrian_db
+      - DB_NAME=erjulrian_inventory
       - RABBITMQ_URL=amqp://rabbitmq:5672
     networks:
       - erjulrian-network
@@ -141,18 +134,64 @@ services:
       - erjulrian-network
     restart: always
   
-  db:
+  db-hero:
     image: postgres:16-alpine
-    container_name: erjulrian-db
+    container_name: erjulrian-db-hero
     environment:
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=toto123
-      - POSTGRES_DB=erjulrian_db
+      - POSTGRES_DB=erjulrian_hero
     ports:
       - "5432:5432"
     volumes:
-      - db-data:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d
+      - db-hero-data:/var/lib/postgresql/data
+      - ./init-db/1-init-hero.sql:/docker-entrypoint-initdb.d/1-init-hero.sql
+    networks:
+      - erjulrian-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  db-inventory:
+    image: postgres:16-alpine
+    container_name: erjulrian-db-inventory
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=toto123
+      - POSTGRES_DB=erjulrian_inventory
+    ports:
+      - "5433:5432"
+    volumes:
+      - db-inventory-data:/var/lib/postgresql/data
+      - ./init-db/2-init-inventory.sql:/docker-entrypoint-initdb.d/2-init-inventory.sql
+    networks:
+      - erjulrian-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  db-game:
+    image: postgres:16-alpine
+    container_name: erjulrian-db-game
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=toto123
+      - POSTGRES_DB=erjulrian_game
+    ports:
+      - "5434:5432"
+    volumes:
+      - db-game-data:/var/lib/postgresql/data
+      - ./init-db/3-init-game.sql:/docker-entrypoint-initdb.d/3-init-game.sql
+      - ./init-db/4-load-monsters.sql:/docker-entrypoint-initdb.d/4-load-monsters.sql
+      - ./init-db/5-load-artifacts.sql:/docker-entrypoint-initdb.d/5-load-artifacts.sql
     networks:
       - erjulrian-network
     healthcheck:
@@ -191,10 +230,14 @@ services:
     build: ./dungeon
     container_name: dungeon-api
     depends_on:
-      - mongo
-      - rabbitmq
-      - db
-      - redis
+      mongo:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      db-game:
+        condition: service_healthy
+      redis:
+        condition: service_started
     ports:
       - "3005:3005"
     environment:
@@ -203,23 +246,19 @@ services:
       - MONGO_URL=mongodb://mongo:27017/erjulrian_dungeon
       - RABBITMQ_URL=amqp://rabbitmq:5672
       - REDIS_URL=redis://redis:6379
-      - DB_HOST=db
+      - DB_HOST=db-game
       - DB_PORT=5432
-      - DB_USER=inventory_user
-      - DB_PASSWORD=inventory_password
-      - DB_NAME=erjulrian_db
+      - DB_USER=dungeon_user
+      - DB_PASSWORD=dungeon_password
+      - DB_NAME=erjulrian_game
     networks:
       - erjulrian-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
     restart: always
 
 volumes:
-  db-data:
+  db-hero-data:
+  db-inventory-data:
+  db-game-data:
   mongo-data:
   redis-data:
 

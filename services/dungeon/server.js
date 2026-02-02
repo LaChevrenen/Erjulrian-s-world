@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const amqp = require('amqplib');
 const { Client } = require('pg');
-const axios = require('axios');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
 const cors = require('cors');
@@ -15,7 +14,6 @@ app.use(express.json());
 const PORT = process.env.PORT || 3005;
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/erjulrian_dungeon';
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
-const HERO_API_URL = process.env.HERO_API_URL || 'http://hero-service:3003/api';
 
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
@@ -107,19 +105,50 @@ async function getMonsterWithLoot(monsterId) {
 }
 
 async function getHeroStats(heroId) {
-    const response = await axios.get(`${HERO_API_URL}/heroes/${heroId}`);
-    const hero = response.data;
-    return {
-        heroId,
-        level: hero.level,
-        xp: hero.xp,
-        stats: {
-            hp: hero.base_hp,
-            att: hero.base_att,
-            def: hero.base_def,
-            regen: hero.base_regen
-        }
-    };
+    if (!channel) {
+        throw new Error('RabbitMQ channel not ready');
+    }
+
+    const correlationId = `${heroId}-${Date.now()}-${Math.random()}`;
+    const reply = await channel.assertQueue('', { exclusive: true });
+
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            reject(new Error('Hero stats request timed out'));
+        }, 5000);
+
+        channel.consume(
+            reply.queue,
+            (msg) => {
+                if (msg?.properties?.correlationId === correlationId) {
+                    clearTimeout(timeout);
+                    try {
+                        const hero = JSON.parse(msg.content.toString());
+                        resolve({
+                            heroId,
+                            level: hero.level,
+                            xp: hero.xp,
+                            stats: {
+                                hp: hero.base_hp,
+                                att: hero.base_att,
+                                def: hero.base_def,
+                                regen: hero.base_regen
+                            }
+                        });
+                    } catch (error) {
+                        reject(error);
+                    }
+                }
+            },
+            { noAck: true }
+        );
+
+        channel.sendToQueue(
+            'hero_queue',
+            Buffer.from(JSON.stringify({ action: 'get', heroId })),
+            { replyTo: reply.queue, correlationId, persistent: true }
+        );
+    });
 }
 
 // RabbitMQ publisher setup

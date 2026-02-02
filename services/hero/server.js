@@ -81,14 +81,23 @@ async function startHeroConsumer() {
                     
                     switch (action) {
                         case 'get':
-                            // GET hero stats
+                            // GET hero stats (reply-to support)
                             const heroResult = await dbClient.query(
                                 'SELECT * FROM hero_schema.HeroStats WHERE hero_id = $1',
                                 [heroId]
                             );
-                            
+
                             if (heroResult.rowCount > 0) {
                                 console.log(`Retrieved stats for hero ${heroId}`);
+                            }
+
+                            if (msg.properties?.replyTo) {
+                                const payload = heroResult.rows[0] || null;
+                                rabbitChannel.sendToQueue(
+                                    msg.properties.replyTo,
+                                    Buffer.from(JSON.stringify(payload)),
+                                    { correlationId: msg.properties.correlationId }
+                                );
                             }
                             break;
                             

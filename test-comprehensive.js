@@ -1,5 +1,6 @@
 const amqp = require('amqplib');
 const axios = require('axios');
+const { Client } = require('pg');
 const { randomUUID } = require('crypto');
 const artifacts = require('./data/artifacts.json');
 
@@ -17,6 +18,14 @@ const HERO_API = 'http://localhost:3003/api';
 const INVENTORY_API = 'http://localhost:3004/api';
 const LOG_API = 'http://localhost:3009/api';
 const DUNGEON_API = 'http://localhost:3005/api/dungeons';
+
+const dbConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
+    user: process.env.DB_USER || 'admin',
+    password: process.env.DB_PASSWORD || 'toto123',
+    database: process.env.DB_NAME || 'erjulrian_db'
+};
 
 let channel;
 let testResults = {
@@ -423,7 +432,7 @@ async function testDungeonServiceREST() {
         const heroCreate = await axios.post(`${HERO_API}/heroes`, { userId: randomUUID() });
         const heroId = heroCreate.data.heroId;
         const startRes = await axios.post(`${DUNGEON_API}/start`, { heroId });
-        logTest('Start dungeon run', startRes.status === 200 && startRes.data.runId);
+        logTest('Start dungeon run', [200, 201].includes(startRes.status) && startRes.data.runId);
         
         if (!startRes.data.runId) {
             console.log('   Skipping dungeon tests - no runId returned');
@@ -438,12 +447,12 @@ async function testDungeonServiceREST() {
         
         // Test 3: Get choices
         const choicesRes = await axios.get(`${DUNGEON_API}/${runId}/choices`);
-        logTest('Get dungeon choices', choicesRes.status === 200 && Array.isArray(choicesRes.data));
+        logTest('Get dungeon choices', choicesRes.status === 200 && Array.isArray(choicesRes.data.choices));
         
         // Test 4: Make a choice
-        if (choicesRes.data.length > 0) {
+        if (choicesRes.data.choices.length > 0) {
             const choiceRes = await axios.post(`${DUNGEON_API}/${runId}/choose`, { 
-                choiceId: choicesRes.data[0].choiceId 
+                choiceIndex: 0
             });
             logTest('Make dungeon choice', choiceRes.status === 200);
         }
@@ -454,6 +463,67 @@ async function testDungeonServiceREST() {
         
     } catch (error) {
         console.error('Dungeon REST test failed:', error.message);
+    }
+}
+
+// ============================================
+// GAME DATA LINKAGE TESTS
+// ============================================
+async function testGameDataLinkage() {
+    console.log('\n' + '='.repeat(70));
+    console.log('🧪 TEST SUITE: Game Data Linkage (DB)');
+    console.log('='.repeat(70));
+
+    const client = new Client(dbConfig);
+    try {
+        await client.connect();
+
+        const monstersRes = await client.query('SELECT id FROM game_schema.Monsters LIMIT 5');
+        logTest('Monsters seeded in DB', monstersRes.rowCount > 0, `Count: ${monstersRes.rowCount}`);
+
+        const monsterId = monstersRes.rows[0]?.id;
+        if (monsterId) {
+            const lootRes = await client.query(
+                'SELECT artifact_id FROM game_schema.MonsterLoot WHERE monster_id = $1',
+                [monsterId]
+            );
+            logTest('Monster has loot in DB', lootRes.rowCount > 0, `Loot rows: ${lootRes.rowCount}`);
+
+            if (lootRes.rowCount > 0) {
+                const artifactIds = lootRes.rows.map(r => r.artifact_id);
+                const artifactsRes = await client.query(
+                    'SELECT COUNT(*)::int AS count FROM game_schema.Artifacts WHERE id = ANY($1::uuid[])',
+                    [artifactIds]
+                );
+                logTest('Loot artifacts exist in DB', artifactsRes.rows[0]?.count === artifactIds.length,
+                    `Found: ${artifactsRes.rows[0]?.count}/${artifactIds.length}`);
+            }
+        }
+
+        // Validate dungeon rooms reference monsters in DB
+        const heroCreate = await axios.post(`${HERO_API}/heroes`, { userId: randomUUID() });
+        const heroId = heroCreate.data.heroId;
+        const startRes = await axios.post(`${DUNGEON_API}/start`, { heroId });
+
+        const rooms = startRes.data?.rooms || [];
+        const roomMonsterIds = [...new Set(rooms
+            .filter(r => ['combat', 'elite-combat', 'boss'].includes(r.type) && r.monsterId)
+            .map(r => r.monsterId))];
+
+        if (roomMonsterIds.length > 0) {
+            const roomMonsterRes = await client.query(
+                'SELECT COUNT(*)::int AS count FROM game_schema.Monsters WHERE id = ANY($1::uuid[])',
+                [roomMonsterIds]
+            );
+            logTest('Dungeon room monsters exist in DB', roomMonsterRes.rows[0]?.count === roomMonsterIds.length,
+                `Found: ${roomMonsterRes.rows[0]?.count}/${roomMonsterIds.length}`);
+        } else {
+            logTest('Dungeon rooms include monsters', false, 'No combat rooms with monsterId');
+        }
+    } catch (error) {
+        logTest('Game data linkage tests', false, '', error.message);
+    } finally {
+        await client.end();
     }
 }
 
@@ -801,6 +871,9 @@ async function runAllTests() {
     await sleep(1000);
     
     await testDungeonServiceREST();
+    await sleep(1000);
+
+    await testGameDataLinkage();
     await sleep(1000);
     
     await testConcurrentHeroUpdates();

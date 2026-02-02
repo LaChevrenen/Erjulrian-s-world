@@ -1,11 +1,14 @@
 const amqp = require('amqplib'); // Pour RabbitMQ
 
+const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672';
+
 let logChannel;
+let combatChannel;
 
 // RabbitMQ connection
 async function connectRabbitMQ() {
     try {
-        const connection = await amqp.connect('amqp://rabbitmq:5672');
+        const connection = await amqp.connect(RABBITMQ_URL);
         logChannel = await connection.createChannel();
         const queue = 'log_queue';
         await logChannel.assertQueue(queue, { durable: true });
@@ -39,45 +42,35 @@ async function sendLog(heroId, level, eventType, payload) {
 async function start() {
     await connectRabbitMQ();
     
-    const connection = await amqp.connect('amqp://rabbitmq');
-    const channel = await connection.createChannel();
+    const connection = await amqp.connect(RABBITMQ_URL);
+    combatChannel = await connection.createChannel();
     
     const queue = 'combat_queue';
-    await channel.assertQueue(queue, { durable: true });
+    await combatChannel.assertQueue(queue, { durable: true });
+
+    const resultQueue = 'combat_result_queue';
+    await combatChannel.assertQueue(resultQueue, { durable: true });
+
+    const heroQueue = 'hero_queue';
+    const inventoryQueue = 'inventory_queue';
+    await combatChannel.assertQueue(heroQueue, { durable: true });
+    await combatChannel.assertQueue(inventoryQueue, { durable: true });
 
     console.log("Service de combat en attente de messages...");
 
-    channel.consume(queue, async (msg) => {
-        // handle parse error
-        let combatData;
-        try {
-            combatData = JSON.parse(msg.content.toString());
-        } catch (error) {
-            console.error("Erreur de parsing du message de combat:", error);
-            channel.ack(msg); // Acknowledge message to remove it from the queue
-            return;
-        }
+    combatChannel.consume(queue, async (msg) => {
+        const combatData = JSON.parse(msg.content.toString());
         const heroId = combatData.hero.heroId;
         const monsterName = combatData.monster.name;
         
         console.log("Combat reçu :", combatData);
         await sendLog(heroId, 'info', 'combat_start', { monsterName, monsterType: combatData.monster.type });
 
-        // compuet battle and handle wrong data structure
-        let battleResult;
-        try {
-            battleResult = computeBattle(combatData);
-        } catch (error) {
-            console.error("Unable to process combat data:", error);
-            await sendLog(heroId, 'error', 'combat_error', { error: error.message });
-            channel.ack(msg); // Acknowledge message to remove it from the queue
-            return;
-        }
-
+        const battleResult = computeBattle(combatData);
+        
         // send message to another queue
-        const resultQueue = 'combat_result_queue';
-        channel.assertQueue(resultQueue, { durable: true });
-        channel.sendToQueue(resultQueue, Buffer.from(JSON.stringify(battleResult)), { persistent: true });
+        combatChannel.sendToQueue(resultQueue, Buffer.from(JSON.stringify(battleResult)), { persistent: true });
+
         console.log("Résultat du combat envoyé :", battleResult);
         
         // Log combat result
@@ -87,20 +80,46 @@ async function start() {
             monsterName, 
             lootCount: (battleResult.loot || []).length 
         });
-        console.log("log sent for log service");
 
-        // send message to inventory service if there is loot
-        if (battleResult.result === 'win') {
-            // add action to battleResult
-            battleResult.action = 'update_inventory';
-            const inventoryQueue = 'inventory_queue';
-            channel.assertQueue(inventoryQueue, { durable: true });
-            channel.sendToQueue(inventoryQueue, Buffer.from(JSON.stringify(battleResult)), { persistent: true });
-            console.log("Loot sent to inventory service:", battleResult);
+        combatChannel.ack(msg);
+
+    }, { noAck: false });
+
+    // Consumer for combat results -> apply hero/inventory updates
+    combatChannel.consume(resultQueue, async (msg) => {
+        const result = JSON.parse(msg.content.toString());
+
+        try {
+            if (result.result === 'win') {
+                const xpDelta = result.xpDelta || 0;
+                const goldDelta = result.goldDelta || 0;
+                const itemsToAdd = (result.loot || []).map(l => ({
+                    artifactId: l.artifactId,
+                    quantity: l.amount || 1
+                }));
+
+                // Update hero
+                combatChannel.sendToQueue('hero_queue', Buffer.from(JSON.stringify({
+                    action: 'update_hero',
+                    heroId: result.heroId,
+                    xpDelta,
+                    hpDelta: 0
+                })), { persistent: true });
+
+                // Update inventory
+                combatChannel.sendToQueue('inventory_queue', Buffer.from(JSON.stringify({
+                    action: 'update_inventory',
+                    heroId: result.heroId,
+                    goldDelta,
+                    itemsToAdd,
+                    itemsToRemove: []
+                })), { persistent: true });
+            }
+        } catch (error) {
+            console.error('Failed to apply combat result:', error);
         }
 
-        channel.ack(msg);
-
+        combatChannel.ack(msg);
     }, { noAck: false });
 }
 
@@ -108,7 +127,7 @@ function battleTest()
 {
         const combatDataSimulation = {
             "hero": {
-            "heroId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "heroId": "12345678",
             "level": 1,
             "xp": 0,
             "stats": {
@@ -131,12 +150,12 @@ function battleTest()
         },
         "lootTable": [
             {
-                "artifactId": 1,
+                "artifactId": "550e8400-e29b-41d4-a716-446655440501",
                 "chance": 0.5,
                 "amount": 1
             },
             {
-                "artifactId": 2,
+                "artifactId": "550e8400-e29b-41d4-a716-446655440502",
                 "chance": 0.2,
                 "amount": 1
             }]
@@ -174,7 +193,6 @@ function computeBattle(combatData)
     let monsterRegen = monsterStats.regen;
 
     let round = 0;
-    let gold = 0;
 
     // extract stats needed for logging
     let monsterName = combatData.monster.name;
@@ -186,8 +204,6 @@ function computeBattle(combatData)
         const damageToMonster = Math.max(0, heroAtt - monsterDef);
         monsterHp -= damageToMonster;
         console.log(`Round ${round}: you deals ${damageToMonster} damage to ${monsterName}. ${monsterName} HP: ${monsterHp}`);
-        // earn two gold per per damage dealt
-        gold += damageToMonster * 2;
 
         if (monsterHp <= 0) break; // Monster defeated
 
@@ -195,8 +211,6 @@ function computeBattle(combatData)
         const damageToHero = Math.max(0, monsterAtt - heroDef);
         heroHp -= damageToHero;
         console.log(`Round ${round}: ${monsterName} deals ${damageToHero} damage to you. Your HP: ${heroHp}`);
-        // lose one gold per damage taken
-        gold -= damageToHero * 1;
 
         if (heroHp <= 0) break; // Hero defeated
 
@@ -215,16 +229,15 @@ function computeBattle(combatData)
 
     // Determine the winner
 
-    let battleJson = {};
+    let battleJson = {
+        heroId: combatData.hero.heroId
+    };
 
     if (heroHp > 0) {
         battleJson.result = "win";
     } else {
         battleJson.result = "lose";
     }
-
-    // Add earned gold to the result
-    battleJson.gold = Math.max(0, gold);
 
     // Compyte battle loot if hero wins
     if (battleJson.result === "win") {
@@ -238,17 +251,27 @@ function computeBattle(combatData)
                 });
             }
         }
-        battleJson.items = lootGained;
+        battleJson.loot = lootGained;
+        const rewards = calculateRewards(combatData.monster.stats);
+        battleJson.xpDelta = rewards.xpDelta;
+        battleJson.goldDelta = rewards.goldDelta;
     }
     else 
     {
-        battleJson.items = [];
+        battleJson.loot = [];
+        battleJson.xpDelta = 0;
+        battleJson.goldDelta = 0;
     }
-    
-    battleJson.heroId = combatData.hero.heroId;
-    battleJson.remainingHp = Math.max(0, heroHp);
 
     return battleJson;
+}
+
+function calculateRewards(stats) {
+    const base = Math.max(1, (stats?.hp || 0) + (stats?.att || 0) + (stats?.def || 0) + (stats?.regen || 0));
+    return {
+        xpDelta: Math.max(1, Math.floor(base / 2)),
+        goldDelta: Math.max(0, Math.floor(base / 4))
+    };
 }
 
 function assertDataStructure(data)
@@ -290,7 +313,7 @@ function assertDataStructure(data)
         return false;
     }
     for (const loot of monster.lootTable) {
-        if (typeof loot.artifactId !== 'number' || typeof loot.chance !== 'number' ||
+        if (typeof loot.artifactId !== 'string' || typeof loot.chance !== 'number' ||
             typeof loot.amount !== 'number') {
             return false;
         }

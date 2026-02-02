@@ -110,7 +110,7 @@ async function startHeroConsumer() {
                                 `UPDATE hero_schema.HeroStats
                                  SET xp = GREATEST(xp + $1, 0),
                                      level = (FLOOR(SQRT(GREATEST(xp + $1, 0) / 100.0)) + 1)::int,
-                                     base_hp = GREATEST($2, 0),
+                                     current_hp = GREATEST( $2, 0),
                                      updated_at = NOW()
                                  WHERE hero_id = $3
                                  RETURNING *`,

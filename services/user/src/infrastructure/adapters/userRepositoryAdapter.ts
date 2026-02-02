@@ -10,7 +10,7 @@ const dbConfig = {
     port: (process.env.DB_PORT || 5432) as number,
     user: process.env.DB_USER || 'user_user',
     password: process.env.DB_PASSWORD || 'user_password',
-    database: process.env.DB_NAME || 'erjulrian'
+    database: process.env.DB_NAME || 'erjulrian_db'
 };
 
 export class UserRepositoryAdapter implements UserRepositoryPort {

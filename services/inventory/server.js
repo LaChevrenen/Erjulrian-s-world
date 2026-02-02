@@ -73,7 +73,7 @@ async function startInventoryConsumer() {
         console.log('Inventory request received:', request);
         
         try {
-          const { action, heroId, gold, items, artifact } = request;
+          const { action, heroId } = request;
           
           switch (action) {
             case 'get':
@@ -118,7 +118,7 @@ async function startInventoryConsumer() {
                 }
               }
               
-              // Add items
+              // Add artifacts
               for (const item of itemsToAdd) {
                 const checkResult = await dbClient.query(
                   'SELECT quantity FROM inventory_schema.InventoryItems WHERE hero_id = $1 AND artifact_id = $2',
@@ -137,8 +137,8 @@ async function startInventoryConsumer() {
                   );
                 }
                 
-                await sendLog(heroId, 1, 'item_added', { hero_id: heroId, artifact_id: item.artifactId, quantity: item.quantity || 1 });
-                console.log(`Added item ${item.artifactId} (qty: ${item.quantity || 1}) to hero ${heroId}`);
+                await sendLog(heroId, 1, 'artifact_added', { hero_id: heroId, artifact_id: item.artifactId, quantity: item.quantity || 1 });
+                console.log(`Added artifact ${item.artifactId} (qty: ${item.quantity || 1}) to hero ${heroId}`);
               }
               
               // Remove items
@@ -149,8 +149,8 @@ async function startInventoryConsumer() {
                   [heroId, itemId]
                 );
                 
-                await sendLog(heroId, 1, 'item_removed', { hero_id: heroId, artifact_id: itemId });
-                console.log(`Removed item ${itemId} from hero ${heroId}`);
+                await sendLog(heroId, 1, 'artifact_removed', { hero_id: heroId, artifact_id: itemId });
+                console.log(`Removed artifact ${itemId} from hero ${heroId}`);
               }
               
               console.log(`Updated inventory for hero ${heroId}: gold=${goldDelta}, items_added=${itemsToAdd.length}, items_removed=${itemsToRemove.length}`);

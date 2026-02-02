@@ -28,10 +28,10 @@ services:
     depends_on:
       - rabbitmq
     ports:
-      - "3000:3000"
+      - "3002:3002"
     environment:
       - NODE_ENV=development
-      - PORT=3000
+      - PORT=3002
       - RABBITMQ_URL=amqp://rabbitmq:5672
     networks:
       - erjulrian-network

@@ -39,7 +39,7 @@ export class UserRepositoryAdapter implements UserRepositoryPort {
 
     async findAll(): Promise<User[]> {
         const result = await this.dbClient.query('SELECT * FROM users');
-        return result.rows.map(row => new User(row.id, row.name, row.is_admin));
+        return result.rows.map(row => new User(row.id, row.username, row.is_admin));
     }
 
 
@@ -54,7 +54,7 @@ export class UserRepositoryAdapter implements UserRepositoryPort {
         }
         
         const row = result.rows[0];
-        return new User(row.id, row.name, row.is_admin);
+        return new User(row.id, row.username, row.is_admin);
     }
 
     async findByName(name: string): Promise<User | null> {
@@ -80,7 +80,7 @@ export class UserRepositoryAdapter implements UserRepositoryPort {
         );
         
         const row = result.rows[0];
-        return new User(row.id, row.name, row.is_admin);
+        return new User(row.id, row.username, row.is_admin);
     }
 
     async delete(id: string): Promise<User | null> {
@@ -94,7 +94,7 @@ export class UserRepositoryAdapter implements UserRepositoryPort {
         }
         
         const row = result.rows[0];
-        return new User(row.id, row.name, row.is_admin);
+        return new User(row.id, row.username, row.is_admin);
     }
 
     async update(user: User): Promise<User | null> {
@@ -108,7 +108,7 @@ export class UserRepositoryAdapter implements UserRepositoryPort {
         }
         
         const row = result.rows[0];
-        return new User(row.id, row.name, row.is_admin);
+        return new User(row.id, row.username, row.is_admin);
     }
 
     async close() {

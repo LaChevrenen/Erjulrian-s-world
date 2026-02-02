@@ -1,7 +1,7 @@
-import Router from 'express';
+import {Router} from 'express';
 import {forward} from '../services/proxy.service.js';
 import {auth} from '../middlewares/auth.middlewares.js';
-const INVENTORY_SERVICE_URL = 'http://localhost:3004';
+const INVENTORY_SERVICE_URL = 'http://inventory-api:3004';
 
 const inventoryRouter = Router();
 // Create inventory

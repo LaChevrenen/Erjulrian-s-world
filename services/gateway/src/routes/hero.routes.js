@@ -1,7 +1,7 @@
-import Router from 'express';
+import {Router} from 'express';
 import {forward} from '../services/proxy.service.js';
 import {auth} from '../middlewares/auth.middlewares.js';
-const HERO_SERVICE_URL = 'http://localhost:3003';
+const HERO_SERVICE_URL = 'http://hero-api:3003';
 
 const heroRouter = Router();
 

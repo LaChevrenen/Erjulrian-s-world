@@ -44,9 +44,11 @@ async function connectRabbitMQ() {
     rabbitChannel = await connection.createChannel();
     
     // Assert queues
-    await rabbitChannel.assertQueue('log_queue', { durable: true });
-    await rabbitChannel.assertQueue('inventory_queue', { durable: true });
+    const logQueue = await rabbitChannel.assertQueue('log_queue', { durable: true });
+    const inventoryQueue = await rabbitChannel.assertQueue('inventory_queue', { durable: true });
     
+    console.log('✓ log_queue created:', logQueue.queue);
+    console.log('✓ inventory_queue created:', inventoryQueue.queue);
     console.log('Connected to RabbitMQ');
     
     // Start consuming inventory queue
@@ -58,9 +60,13 @@ async function connectRabbitMQ() {
 }
 
 async function startInventoryConsumer() {
-  if (!rabbitChannel) return;
+  if (!rabbitChannel) {
+    console.error('Cannot start inventory consumer: rabbitChannel is null');
+    return;
+  }
   
   try {
+    console.log('Starting inventory queue consumer...');
     rabbitChannel.consume('inventory_queue', async (msg) => {
       if (msg !== null) {
         const request = JSON.parse(msg.content.toString());
@@ -86,47 +92,68 @@ async function startInventoryConsumer() {
               }
               break;
               
-            case 'add_gold':
-              // Add gold to inventory
-              await dbClient.query(
-                'UPDATE inventory_schema.Inventories SET gold = gold + $1 WHERE hero_id = $2',
-                [gold, heroId]
-              );
-              await sendLog(heroId, 1, 'gold_added', { hero_id: heroId, gold_added: gold });
-              console.log(`Added ${gold} gold to hero ${heroId}`);
-              break;
+            case 'update_inventory':
+              // Combined inventory update - handle gold and items in one operation
+              // goldDelta can be positive (add) or negative (remove)
+              const goldDelta = request.goldDelta || 0;
+              const itemsToAdd = request.itemsToAdd || [];
+              const itemsToRemove = request.itemsToRemove || [];
               
-            case 'remove_gold':
-              // Remove gold from inventory
-              await dbClient.query(
-                'UPDATE inventory_schema.Inventories SET gold = GREATEST(gold - $1, 0) WHERE hero_id = $2',
-                [gold, heroId]
-              );
-              await sendLog(heroId, 1, 'gold_removed', { hero_id: heroId, gold_removed: gold });
-              console.log(`Removed ${gold} gold from hero ${heroId}`);
-              break;
+              // Update gold if there's a change
+              if (goldDelta !== 0) {
+                if (goldDelta > 0) {
+                  await dbClient.query(
+                    'UPDATE inventory_schema.Inventories SET gold = gold + $1 WHERE hero_id = $2',
+                    [goldDelta, heroId]
+                  );
+                  await sendLog(heroId, 1, 'gold_added', { hero_id: heroId, gold_added: goldDelta });
+                  console.log(`Added ${goldDelta} gold to hero ${heroId}`);
+                } else {
+                  await dbClient.query(
+                    'UPDATE inventory_schema.Inventories SET gold = GREATEST(gold + $1, 0) WHERE hero_id = $2',
+                    [goldDelta, heroId]
+                  );
+                  await sendLog(heroId, 1, 'gold_removed', { hero_id: heroId, gold_removed: Math.abs(goldDelta) });
+                  console.log(`Removed ${Math.abs(goldDelta)} gold from hero ${heroId}`);
+                }
+              }
               
-            case 'add_item':
-              // Add item to inventory
-              await dbClient.query(
-                `INSERT INTO inventory_schema.InventoryItems (hero_id, artifact_id, quantity, equipped)
-                 VALUES ($1, $2, $3, false)
-                 ON CONFLICT (hero_id, artifact_id) DO UPDATE SET quantity = quantity + $3`,
-                [heroId, artifact.artifactId, artifact.quantity || 1]
-              );
-              await sendLog(heroId, 1, 'item_added', { hero_id: heroId, artifact_id: artifact.artifactId });
-              console.log(`Added item ${artifact.artifactId} to hero ${heroId}`);
-              break;
+              // Add items
+              for (const item of itemsToAdd) {
+                const checkResult = await dbClient.query(
+                  'SELECT quantity FROM inventory_schema.InventoryItems WHERE hero_id = $1 AND artifact_id = $2',
+                  [heroId, item.artifactId]
+                );
+                
+                if (checkResult.rowCount > 0) {
+                  await dbClient.query(
+                    'UPDATE inventory_schema.InventoryItems SET quantity = quantity + $1 WHERE hero_id = $2 AND artifact_id = $3',
+                    [item.quantity || 1, heroId, item.artifactId]
+                  );
+                } else {
+                  await dbClient.query(
+                    'INSERT INTO inventory_schema.InventoryItems (hero_id, artifact_id, quantity, equipped) VALUES ($1, $2, $3, false)',
+                    [heroId, item.artifactId, item.quantity || 1]
+                  );
+                }
+                
+                await sendLog(heroId, 1, 'item_added', { hero_id: heroId, artifact_id: item.artifactId, quantity: item.quantity || 1 });
+                console.log(`Added item ${item.artifactId} (qty: ${item.quantity || 1}) to hero ${heroId}`);
+              }
               
-            case 'remove_item':
-              // Remove item from inventory
-              await dbClient.query(
-                `DELETE FROM inventory_schema.InventoryItems 
-                 WHERE hero_id = $1 AND artifact_id = $2`,
-                [heroId, artifact.artifactId]
-              );
-              await sendLog(heroId, 1, 'item_removed', { hero_id: heroId, artifact_id: artifact.artifactId });
-              console.log(`Removed item ${artifact.artifactId} from hero ${heroId}`);
+              // Remove items
+              for (const itemId of itemsToRemove) {
+                await dbClient.query(
+                  `DELETE FROM inventory_schema.InventoryItems 
+                   WHERE hero_id = $1 AND artifact_id = $2`,
+                  [heroId, itemId]
+                );
+                
+                await sendLog(heroId, 1, 'item_removed', { hero_id: heroId, artifact_id: itemId });
+                console.log(`Removed item ${itemId} from hero ${heroId}`);
+              }
+              
+              console.log(`Updated inventory for hero ${heroId}: gold=${goldDelta}, items_added=${itemsToAdd.length}, items_removed=${itemsToRemove.length}`);
               break;
               
             default:
@@ -192,14 +219,19 @@ app.post('/api/inventory', async (req, res) => {
     const insertInventory = `
       INSERT INTO inventory_schema.Inventories (hero_id, gold)
       VALUES ($1, $2)
-      ON CONFLICT (hero_id) DO NOTHING
+      ON CONFLICT (hero_id) DO UPDATE SET gold = $2
       RETURNING hero_id, gold
     `;
 
     const result = await dbClient.query(insertInventory, [heroId, Number.isInteger(gold) ? gold : 0]);
 
     if (result.rowCount === 0) {
-      return res.status(409).json({ error: 'Inventory already exists' });
+      // If conflict occurred, fetch the existing inventory
+      const existingResult = await dbClient.query(
+        'SELECT hero_id, gold FROM inventory_schema.Inventories WHERE hero_id = $1',
+        [heroId]
+      );
+      return res.status(200).json({ heroId, gold: existingResult.rows[0]?.gold || 0, items: [] });
     }
 
     await sendLog(heroId, 1, 'inventory_created', { hero_id: heroId, gold: result.rows[0].gold });

@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import cors from 'cors';
 import * as fs from "node:fs";
 import * as YAML from 'yaml';
 import swaggerUi from 'swagger-ui-express';
@@ -10,10 +11,12 @@ import { UserController } from "../presentation/controllers/userController";
 import { errorHandler } from "./errorHandling";
 
 const app = express();
+
+app.use(cors());
 app.use(express.json());
 
 
-const file  = fs.readFileSync(require.resolve('../api/user.yml'), 'utf8')
+const file  = fs.readFileSync(require.resolve('../../user.yml'), 'utf8')
 const swaggerDocument = YAML.parse(file)
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));

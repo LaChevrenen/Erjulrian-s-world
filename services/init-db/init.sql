@@ -103,7 +103,8 @@ CREATE SCHEMA user_schema AUTHORIZATION admin;
 
 CREATE TABLE user_schema.Users (
   id UUID PRIMARY KEY,
-  username VARCHAR(255)
+  username VARCHAR(255),
+  is_admin BOOLEAN
 );
 
 GRANT USAGE, CREATE ON SCHEMA user_schema TO user_user;

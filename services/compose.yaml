@@ -1,4 +1,27 @@
 services:
+  user-service:
+    build: ./user
+    container_name: user-api
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=user_user
+      - DB_PASSWORD=user_password
+      - DB_NAME=erjulrian_db
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    networks:
+      - erjulrian-network
+    restart: always
+
   combat-service:
     build: ./combat
     container_name: combat-api
@@ -9,6 +32,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3005
+      - RABBITMQ_URL=amqp://rabbitmq:5672
     networks:
       - erjulrian-network
     restart: always
@@ -80,6 +104,7 @@ services:
       - "15672:15672"
     networks:
       - erjulrian-network
+    restart: always
 
   elasticsearch:
     image: elasticsearch:8.11.0
@@ -107,7 +132,13 @@ services:
       - ./init-db:/docker-entrypoint-initdb.d
     networks:
       - erjulrian-network
-
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
 
 volumes:
   db-data:
@@ -115,4 +146,3 @@ volumes:
 networks:
   erjulrian-network:
     driver: bridge
-

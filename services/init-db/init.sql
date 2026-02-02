@@ -61,45 +61,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA game_schema TO inventory_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA game_schema TO hero_user;
 
 -- ###########################################
--- INVENTORY SERVICE SCHEMA
--- ###########################################
-
--- Creation of the schema for inventory service
-CREATE SCHEMA inventory_schema AUTHORIZATION admin;
-
-CREATE TABLE inventory_schema.Inventories (
-  hero_id char(36) PRIMARY KEY,
-  gold int
-);
-
-CREATE TABLE inventory_schema.InventoryItems (
-  hero_id char(36),
-  artifact_id UUID,
-  quantity int,
-  equipped boolean,
-  PRIMARY KEY (hero_id, artifact_id),
-  FOREIGN KEY (hero_id) REFERENCES inventory_schema.Inventories(hero_id) ON DELETE CASCADE,
-  FOREIGN KEY (artifact_id) REFERENCES game_schema.Artifacts(id)
-);
-
--- ###########################################
--- INVENTORY SERVICE PERMISSIONS
--- ###########################################
-
--- Set permissions for inventory service user on inventory schema
-GRANT USAGE, CREATE ON SCHEMA inventory_schema TO inventory_user;
-GRANT USAGE ON SCHEMA inventory_schema TO inventory_user;
-
--- Set permissions on tables
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA inventory_schema TO admin;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA inventory_schema TO inventory_user;
-
--- Set visibility on sequences
-ALTER ROLE admin SET search_path TO inventory_schema, public;
-ALTER ROLE inventory_user SET search_path TO inventory_schema, public;
-
--- ###########################################
--- HERO SERVICE SCHEMA
+-- HERO SERVICE SCHEMA (doit être créé AVANT inventory)
 -- ###########################################
 
 -- Creation of the schema for hero service
@@ -143,6 +105,45 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA hero_schema TO hero
 -- Set visibility on sequences
 ALTER ROLE admin SET search_path TO hero_schema, public;
 ALTER ROLE hero_user SET search_path TO hero_schema, public;
+
+-- ###########################################
+-- INVENTORY SERVICE SCHEMA
+-- ###########################################
+
+-- Creation of the schema for inventory service
+CREATE SCHEMA inventory_schema AUTHORIZATION admin;
+
+CREATE TABLE inventory_schema.Inventories (
+  hero_id UUID PRIMARY KEY,
+  gold int,
+  FOREIGN KEY (hero_id) REFERENCES hero_schema.HeroStats(hero_id) ON DELETE CASCADE
+);
+
+CREATE TABLE inventory_schema.InventoryItems (
+  hero_id UUID,
+  artifact_id UUID,
+  quantity int,
+  equipped boolean,
+  PRIMARY KEY (hero_id, artifact_id),
+  FOREIGN KEY (hero_id) REFERENCES inventory_schema.Inventories(hero_id) ON DELETE CASCADE,
+  FOREIGN KEY (artifact_id) REFERENCES game_schema.Artifacts(id)
+);
+
+-- ###########################################
+-- INVENTORY SERVICE PERMISSIONS
+-- ###########################################
+
+-- Set permissions for inventory service user on inventory schema
+GRANT USAGE, CREATE ON SCHEMA inventory_schema TO inventory_user;
+GRANT USAGE ON SCHEMA inventory_schema TO inventory_user;
+
+-- Set permissions on tables
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA inventory_schema TO admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA inventory_schema TO inventory_user;
+
+-- Set visibility on sequences
+ALTER ROLE admin SET search_path TO inventory_schema, public;
+ALTER ROLE inventory_user SET search_path TO inventory_schema, public;
 
 -- ###########################################
 

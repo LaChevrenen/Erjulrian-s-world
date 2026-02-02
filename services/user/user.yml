@@ -13,9 +13,6 @@ paths:
       operationId: findAll
       tags:
         - user
-      parameters:
-        - searchCriteria:
-            required: false
       responses:
         '200':
           description: Users where found
@@ -30,13 +27,6 @@ paths:
       operationId: update
       tags:
         - user
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: The user id
-          schema:
-            type: string
       requestBody:
         required: true
         content:

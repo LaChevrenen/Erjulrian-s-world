@@ -9,10 +9,12 @@ services:
     environment:
       MONGO_URL: mongodb://mongo:27017/erjulrian_dungeon
       RABBITMQ_URL: amqp://rabbitmq:5672
+      REDIS_URL: redis://redis:6379
       PORT: 3005
     depends_on:
       - mongo
       - rabbitmq
+      - redis
     networks:
       - erjulrian-network
 

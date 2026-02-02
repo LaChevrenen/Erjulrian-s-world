@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const amqp = require('amqplib');
+const { createClient } = require('redis');
 const { Client } = require('pg');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
@@ -14,6 +15,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3005;
 const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/erjulrian_dungeon';
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
@@ -35,6 +37,52 @@ async function connectMongoDB() {
     } catch (error) {
         console.error('Failed to connect to MongoDB:', error);
         setTimeout(connectMongoDB, 5000);
+    }
+}
+
+// Redis connection for caching
+let redisClient;
+
+async function connectRedis() {
+    try {
+        redisClient = createClient({ url: REDIS_URL });
+        redisClient.on('error', (error) => {
+            console.error('Redis error:', error);
+        });
+        await redisClient.connect();
+        console.log('Connected to Redis');
+    } catch (error) {
+        console.error('Failed to connect to Redis:', error);
+        setTimeout(connectRedis, 5000);
+    }
+}
+
+async function getCachedDungeon(runId) {
+    if (!redisClient?.isOpen) return null;
+    try {
+        const cached = await redisClient.get(`dungeon:${runId}`);
+        return cached ? JSON.parse(cached) : null;
+    } catch (error) {
+        console.error('Failed to read dungeon cache:', error);
+        return null;
+    }
+}
+
+async function setCachedDungeon(runId, payload) {
+    if (!redisClient?.isOpen) return;
+    try {
+        await redisClient.setEx(`dungeon:${runId}`, 300, JSON.stringify(payload));
+    } catch (error) {
+        console.error('Failed to write dungeon cache:', error);
+    }
+}
+
+async function clearCachedDungeon(runId) {
+    if (!redisClient?.isOpen) return;
+    try {
+        await redisClient.del(`dungeon:${runId}`);
+    } catch (error) {
+        console.error('Failed to clear dungeon cache:', error);
     }
 }
 
@@ -269,6 +317,16 @@ function generateChoices(currentFloor, currentRoom, allRooms) {
     return choices.slice(0, 2); // Return max 2 choices
 }
 
+function buildDungeonResponse(dungeon) {
+    return {
+        runId: dungeon._id?.toString?.() || dungeon.runId?.toString?.() || dungeon._id || dungeon.runId,
+        heroId: dungeon.heroId,
+        status: dungeon.status,
+        position: dungeon.position,
+        rooms: dungeon.rooms
+    };
+}
+
 // REST API Endpoints
 
 // POST /api/dungeons/start - Start a dungeon run
@@ -305,13 +363,10 @@ app.post('/api/dungeons/start', async (req, res) => {
             timestamp: new Date()
         });
 
-        res.status(201).json({
-            runId: (savedDungeon._id || dungeon._id).toString(),
-            heroId: dungeon.heroId,
-            status: dungeon.status,
-            position: dungeon.position,
-            rooms: dungeon.rooms
-        });
+        const payload = buildDungeonResponse(savedDungeon || dungeon);
+        await setCachedDungeon(payload.runId, payload);
+
+        res.status(201).json(payload);
     } catch (error) {
         console.error('Error creating dungeon:', error);
         res.status(500).json({ error: 'Failed to create dungeon' });
@@ -323,19 +378,21 @@ app.get('/api/dungeons/:runId', async (req, res) => {
     try {
         const { runId } = req.params;
         
+        const cachedDungeon = await getCachedDungeon(runId);
+        if (cachedDungeon) {
+            return res.json(cachedDungeon);
+        }
+
         const dungeon = await DungeonRun.findById(runId);
 
         if (!dungeon) {
             return res.status(404).json({ error: 'Dungeon run not found' });
         }
 
-        res.json({
-            runId: dungeon._id,
-            heroId: dungeon.heroId,
-            status: dungeon.status,
-            position: dungeon.position,
-            rooms: dungeon.rooms
-        });
+        const payload = buildDungeonResponse(dungeon);
+        await setCachedDungeon(runId, payload);
+
+        res.json(payload);
     } catch (error) {
         console.error('Error fetching dungeon:', error);
         res.status(500).json({ error: 'Failed to fetch dungeon' });
@@ -347,7 +404,8 @@ app.get('/api/dungeons/:runId/choices', async (req, res) => {
     try {
         const { runId } = req.params;
         
-        const dungeon = await DungeonRun.findById(runId);
+        const cachedDungeon = await getCachedDungeon(runId);
+        const dungeon = cachedDungeon || await DungeonRun.findById(runId);
 
         if (!dungeon) {
             return res.status(404).json({ error: 'Dungeon run not found' });
@@ -411,6 +469,9 @@ app.post('/api/dungeons/:runId/choose', async (req, res) => {
         
         await dungeon.save();
 
+        const payload = buildDungeonResponse(dungeon);
+        await setCachedDungeon(payload.runId, payload);
+
         // Publish event
         await publishEvent('dungeon_queue', {
             type: 'room_entered',
@@ -471,6 +532,9 @@ app.post('/api/dungeons/:runId/finish', async (req, res) => {
             return res.status(404).json({ error: 'Dungeon run not found' });
         }
 
+        const payload = buildDungeonResponse(dungeon);
+        await setCachedDungeon(payload.runId, payload);
+
         // Publish event
         await publishEvent('dungeon_queue', {
             type: 'dungeon_completed',
@@ -502,6 +566,7 @@ app.get('/health', (req, res) => {
 async function start() {
     await connectMongoDB();
     await connectPostgres();
+    await connectRedis();
     await setupRabbitMQ();
     
     app.listen(PORT, () => {

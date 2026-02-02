@@ -151,6 +151,19 @@ services:
       - mongo-data:/data/db
     networks:
       - erjulrian-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: erjulrian-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      - erjulrian-network
+    restart: always
+
   dungeon-service:
     build: ./dungeon
     container_name: dungeon-api
@@ -158,6 +171,7 @@ services:
       - mongo
       - rabbitmq
       - db
+      - redis
     ports:
       - "3005:3005"
     environment:
@@ -165,6 +179,7 @@ services:
       - PORT=3005
       - MONGO_URL=mongodb://mongo:27017/erjulrian_dungeon
       - RABBITMQ_URL=amqp://rabbitmq:5672
+      - REDIS_URL=redis://redis:6379
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=inventory_user
@@ -183,6 +198,7 @@ services:
 volumes:
   db-data:
   mongo-data:
+  redis-data:
 
 networks:
   erjulrian-network:

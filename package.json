@@ -1,0 +1,14 @@
+{
+  "name": "erjulrian-test",
+  "version": "1.0.0",
+  "description": "Test scenario for Erjulrian's World",
+  "main": "test-scenario.js",
+  "scripts": {
+    "seed:game-data": "node scripts/seed-game-data.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.9",
+    "axios": "^1.6.0",
+    "pg": "^8.11.5"
+  }
+}

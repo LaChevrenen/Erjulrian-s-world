@@ -12,6 +12,55 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT ALL ON SCHEMA public TO admin;
 
 -- ###########################################
+-- GAME DATA SCHEMA (ARTIFACTS & MONSTERS)
+-- ###########################################
+
+-- Creation of the schema for game data
+CREATE SCHEMA game_schema AUTHORIZATION admin;
+
+-- Artifacts table
+CREATE TABLE game_schema.Artifacts (
+  id UUID PRIMARY KEY,
+  name VARCHAR,
+  level INT,
+  hp_buff INT,
+  att_buff INT,
+  def_buff INT,
+  regen_buff INT,
+  description TEXT
+);
+
+-- Monsters table
+CREATE TABLE game_schema.Monsters (
+  id UUID PRIMARY KEY,
+  name VARCHAR,
+  type VARCHAR,
+  description TEXT,
+  hp INT,
+  att INT,
+  def INT,
+  regen INT
+);
+
+-- Monster loot table
+CREATE TABLE game_schema.MonsterLoot (
+  monster_id UUID REFERENCES game_schema.Monsters(id) ON DELETE CASCADE,
+  artifact_id UUID REFERENCES game_schema.Artifacts(id),
+  chance FLOAT,
+  amount INT,
+  PRIMARY KEY (monster_id, artifact_id)
+);
+
+-- ###########################################
+-- GAME DATA PERMISSIONS
+-- ###########################################
+
+GRANT USAGE ON SCHEMA game_schema TO inventory_user;
+GRANT USAGE ON SCHEMA game_schema TO hero_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA game_schema TO inventory_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA game_schema TO hero_user;
+
+-- ###########################################
 -- INVENTORY SERVICE SCHEMA
 -- ###########################################
 
@@ -25,10 +74,12 @@ CREATE TABLE inventory_schema.Inventories (
 
 CREATE TABLE inventory_schema.InventoryItems (
   hero_id char(36),
-  artifact_id char(36),
+  artifact_id UUID,
   quantity int,
   equipped boolean,
-  PRIMARY KEY (hero_id, artifact_id)
+  PRIMARY KEY (hero_id, artifact_id),
+  FOREIGN KEY (hero_id) REFERENCES inventory_schema.Inventories(hero_id) ON DELETE CASCADE,
+  FOREIGN KEY (artifact_id) REFERENCES game_schema.Artifacts(id)
 );
 
 -- ###########################################
@@ -67,10 +118,10 @@ CREATE TABLE hero_schema.HeroStats (
   base_att INT DEFAULT 4,
   base_def INT DEFAULT 1,
   base_regen INT DEFAULT 1,
-  artifact_slot_1 UUID,
-  artifact_slot_2 UUID,
-  artifact_slot_3 UUID,
-  artifact_slot_4 UUID,
+  artifact_slot_1 UUID REFERENCES game_schema.Artifacts(id),
+  artifact_slot_2 UUID REFERENCES game_schema.Artifacts(id),
+  artifact_slot_3 UUID REFERENCES game_schema.Artifacts(id),
+  artifact_slot_4 UUID REFERENCES game_schema.Artifacts(id),
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

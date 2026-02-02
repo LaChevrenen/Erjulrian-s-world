@@ -1,5 +1,5 @@
 Table Artifacts {
-  id int [pk, increment]
+  id uuid [pk]
   name varchar
   level int
   hp_buff int

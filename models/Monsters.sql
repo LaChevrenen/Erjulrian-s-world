@@ -1,15 +1,11 @@
 Table Monsters {
-  id int [pk, increment]
+  id uuid [pk]
   name varchar
-  type varchar        // normal, elite, boss
+  type varchar        // goblin, orc, dragon, etc
+  description text
+
   hp int
   att int
   def int
   regen int
-
-  artifact_id int 
-  chance float
-  quantity int
-
-  description text
 }

@@ -9,10 +9,10 @@ Table HeroStats {
   base_def int
   base_regen int
 
-  artifact_slot_1 int
-  artifact_slot_2 int
-  artifact_slot_3 int
-  artifact_slot_4 int
+  artifact_slot_1 uuid
+  artifact_slot_2 uuid
+  artifact_slot_3 uuid
+  artifact_slot_4 uuid
   updated_at timestamp
 
 }

@@ -1,12 +1,12 @@
 meta {
-  name: Create a log
+  name: Get Hero with ID
   type: http
-  seq: 1
+  seq: 2
 }
 
-post {
-  url: http://localhost:3000/api/logs
-  body: json
+get {
+  url: http://localhost:3000/api/heroes/c9aa5d8e-3fae-41a3-ac03-b1ae950c991c
+  body: none
   auth: bearer
 }
 
@@ -16,12 +16,7 @@ auth:bearer {
 
 body:json {
   {
-    "user_id": "0aa88e49-df83-45a9-93ee-9f6b6e93c6b1",
-    "level": 0,
-    "timestamp": "2026-02-02T11:17:02.303Z",
-    "service": "truc",
-    "eventType": "chose",
-    "payload": {}
+    "userId": "c9aa5d8e-3fae-41a3-ac03-b1ae950c991c"
   }
 }
 

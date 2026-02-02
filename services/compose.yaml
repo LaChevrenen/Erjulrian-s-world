@@ -132,6 +132,28 @@ services:
       - ./init-db:/docker-entrypoint-initdb.d
     networks:
       - erjulrian-network
+  dungeon-service:
+    build: ./dungeon
+    container_name: dungeon-api
+    depends_on:
+      - mongo
+      - rabbitmq
+      - db
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - MONGO_URL=mongodb://mongo:27017/erjulrian_dungeon
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - HERO_API_URL=http://hero-service:3003/api
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=inventory_user
+      - DB_PASSWORD=inventory_password
+      - DB_NAME=erjulrian_db
+    networks:
+      - erjulrian-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin"]
       interval: 10s

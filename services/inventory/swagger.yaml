@@ -90,6 +90,8 @@ components:
       properties:
         artifactId:
           type: string
+          format: uuid
+          description: UUID of the artifact
         quantity:
           type: integer
         equipped:

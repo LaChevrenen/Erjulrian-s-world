@@ -90,6 +90,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LogEntry'
+    delete:
+      tags: [Logs]
+      summary: Delete a log entry
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      responses:
+        204:
+          description: Log deleted
 
 components:
 

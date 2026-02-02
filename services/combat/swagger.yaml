@@ -57,7 +57,9 @@ components:
       type: object
       properties:
         artifactId:
-          type: integer
+          type: string
+          format: uuid
+          description: UUID of the artifact
         chance:
           type: number
           description: Probability in percentage (0-100)

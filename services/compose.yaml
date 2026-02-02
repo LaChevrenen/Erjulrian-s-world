@@ -132,6 +132,18 @@ services:
       - ./init-db:/docker-entrypoint-initdb.d
     networks:
       - erjulrian-network
+
+  mongo:
+    image: mongo:latest
+    container_name: erjulrian-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=erjulrian_dungeon
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - erjulrian-network
   dungeon-service:
     build: ./dungeon
     container_name: dungeon-api
@@ -146,7 +158,6 @@ services:
       - PORT=3005
       - MONGO_URL=mongodb://mongo:27017/erjulrian_dungeon
       - RABBITMQ_URL=amqp://rabbitmq:5672
-      - HERO_API_URL=http://hero-service:3003/api
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=inventory_user

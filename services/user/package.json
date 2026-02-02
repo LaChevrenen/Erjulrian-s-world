@@ -1,0 +1,42 @@
+{
+  "name": "user-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/application/server.ts",
+    "build": "rm -rf dist/ && tsc -p tsconfig.json && mkdir dist/src/api && cp src/api/user.yml dist/src/api/user.yml",
+    "start": "node dist/src/application/server.js",
+    "lint": "eslint . --ext .ts",
+    "test": "jest --coverage"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.3",
+    "swagger-ui-express": "5.0.1",
+    "uuid": "^9.0.0",
+    "yaml": "2.8.2"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "^9.4.0",
+    "@stryker-mutator/jest-runner": "^9.4.0",
+    "@types/express": "^4.17.17",
+    "@types/jest": "^29.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.5.1",
+    "@types/swagger-ui-express": "4.1.8",
+    "@types/uuid": "^9.0.2",
+    "@typescript-eslint/eslint-plugin": "^6.7.1",
+    "@typescript-eslint/parser": "^6.7.1",
+    "eslint": "^8.48.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.2.2"
+  }
+}

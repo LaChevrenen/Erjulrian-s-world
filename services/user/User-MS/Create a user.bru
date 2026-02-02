@@ -1,0 +1,23 @@
+meta {
+  name: Create a user
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:3000/user
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "test",
+    "isAdmin": false
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

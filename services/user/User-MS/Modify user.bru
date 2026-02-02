@@ -1,0 +1,25 @@
+meta {
+  name: Modify user
+  type: http
+  seq: 7
+}
+
+put {
+  url: http://localhost:3000/user
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "id": "006685cc-b092-4dca-8037-30ee06dc0be6",
+    "name": "notAdmin_ORADMIN",
+    "isAdmin": true
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

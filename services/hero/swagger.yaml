@@ -33,6 +33,30 @@ paths:
                   heroId:
                     type: string
                     format: uuid
+                  userId:
+                    type: string
+                    format: uuid
+
+  /users/{userId}/heroes:
+    get:
+      tags: [Heroes]
+      summary: Get all heroes for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: List of user heroes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HeroStats'
 
   /heroes/{heroId}:
     get:
@@ -138,6 +162,9 @@ components:
       type: object
       properties:
         hero_id:
+          type: string
+          format: uuid
+        user_id:
           type: string
           format: uuid
         level:

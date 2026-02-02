@@ -111,7 +111,8 @@ CREATE SCHEMA hero_schema AUTHORIZATION admin;
 
 -- Table HeroStats
 CREATE TABLE hero_schema.HeroStats (
-  hero_id UUID PRIMARY KEY,
+  hero_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
   level INT DEFAULT 1,
   xp INT DEFAULT 0,
   base_hp INT DEFAULT 20,
@@ -124,6 +125,8 @@ CREATE TABLE hero_schema.HeroStats (
   artifact_slot_4 UUID REFERENCES game_schema.Artifacts(id),
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_hero_user_id ON hero_schema.HeroStats(user_id);
 
 -- ###########################################
 -- HERO SERVICE PERMISSIONS

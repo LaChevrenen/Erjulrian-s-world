@@ -216,14 +216,14 @@ app.post('/api/heroes', async (req, res) => {
         }
 
         const query = `
-            INSERT INTO hero_schema.HeroStats (hero_id, level, xp, base_hp, base_att, base_def, base_regen, artifact_slot_1, artifact_slot_2, artifact_slot_3, artifact_slot_4, updated_at)
+            INSERT INTO hero_schema.HeroStats (user_id, level, xp, base_hp, base_att, base_def, base_regen, artifact_slot_1, artifact_slot_2, artifact_slot_3, artifact_slot_4, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8::uuid, $9::uuid, $10::uuid, $11::uuid, NOW())
-            RETURNING hero_id
+            RETURNING hero_id, user_id
         `;
         
         // Starting stats
         const values = [
-            userId,      // hero_id = user_id
+            userId,      // user_id
             1,           // level
             0,           // xp
             20,          // base_hp
@@ -237,12 +237,13 @@ app.post('/api/heroes', async (req, res) => {
         ];
         
         const result = await dbClient.query(query, values);
+        const heroId = result.rows[0].hero_id;
         
         // Send log
-        await sendLog(userId, 1, 'hero_created', { hero_id: userId, initial_stats: { hp: 20, att: 4, def: 1, regen: 1 } });
-        await publishHeroEvent('hero_created', { heroId: userId });
+        await sendLog(userId, 1, 'hero_created', { hero_id: heroId, user_id: userId, initial_stats: { hp: 20, att: 4, def: 1, regen: 1 } });
+        await publishHeroEvent('hero_created', { heroId, userId });
         
-        res.status(201).json({ heroId: result.rows[0].hero_id });
+        res.status(201).json({ heroId, userId });
     } catch (error) {
         console.error('Error creating hero:', error);
         res.status(500).json({ error: 'Failed to create hero' });
@@ -267,6 +268,23 @@ app.get('/api/heroes/:heroId', async (req, res) => {
     } catch (error) {
         console.error('Error fetching hero:', error);
         res.status(500).json({ error: 'Failed to fetch hero' });
+    }
+});
+
+// GET /api/users/:userId/heroes - Get all heroes for a user
+app.get('/api/users/:userId/heroes', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        if (!isUuid(userId)) {
+            return res.status(400).json({ error: 'Invalid userId format' });
+        }
+        const query = 'SELECT * FROM hero_schema.HeroStats WHERE user_id = $1 ORDER BY updated_at DESC';
+        const result = await dbClient.query(query, [userId]);
+        
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching user heroes:', error);
+        res.status(500).json({ error: 'Failed to fetch user heroes' });
     }
 });
 

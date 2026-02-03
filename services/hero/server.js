@@ -77,76 +77,37 @@ async function startHeroConsumer() {
                 console.log('Hero request received:', request);
                 
                 try {
-                    const { action, heroId, xp, hp, stats } = request;
+                    const { action, type, heroId, currentHp, maxHp, xpGained } = request;
                     
-                    switch (action) {
-                        case 'get': {
-                            // GET hero stats (reply-to support)
-                            const heroResult = await dbClient.query(
-                                'SELECT * FROM hero_schema.HeroStats WHERE hero_id = $1',
-                                [heroId]
-                            );
+                    // Handle dungeon combat result (hero HP + XP update)
+                    if (type === 'hero_stats_updated') {
+                        const updateResult = await dbClient.query(
+                            `UPDATE hero_schema.HeroStats
+                             SET current_hp = $1,
+                                 xp = xp + $2,
+                                 level = (FLOOR(SQRT(GREATEST(xp + $2, 0) / 100.0)) + 1)::int,
+                                 updated_at = NOW()
+                             WHERE hero_id = $3
+                             RETURNING *`,
+                            [currentHp, xpGained, heroId]
+                        );
 
-                            if (heroResult.rowCount > 0) {
-                                console.log(`Retrieved stats for hero ${heroId}`);
-                            }
-
-                            if (msg.properties?.replyTo) {
-                                const payload = heroResult.rows[0] || null;
-                                rabbitChannel.sendToQueue(
-                                    msg.properties.replyTo,
-                                    Buffer.from(JSON.stringify(payload)),
-                                    { correlationId: msg.properties.correlationId }
-                                );
-                            }
-                            break;
-                        }
-                        case 'update_hero': {
-                            // Combined hero update - handle XP and HP in one operation (atomic)
-                            const xpDelta = request.xpDelta || 0;
-                            const hpDelta = request.hpDelta || 0;
-
-                            const updateResult = await dbClient.query(
-                                `UPDATE hero_schema.HeroStats
-                                 SET xp = GREATEST(xp + $1, 0),
-                                     level = (FLOOR(SQRT(GREATEST(xp + $1, 0) / 100.0)) + 1)::int,
-                                     current_hp = GREATEST( $2, 0),
-                                     updated_at = NOW()
-                                 WHERE hero_id = $3
-                                 RETURNING *`,
-                                [xpDelta, hpDelta, heroId]
-                            );
-
-
-
-                            if (updateResult.rowCount === 0) {
-                                console.warn(`Hero ${heroId} not found`);
-                                break;
-                            }
-
+                        if (updateResult.rowCount > 0) {
                             const updatedHero = updateResult.rows[0];
-
-                            if (xpDelta > 0) {
-                                await sendLog(heroId, 1, 'xp_added', { hero_id: heroId, xp_added: xpDelta, new_level: updatedHero.level });
-                                console.log(`Added ${xpDelta} XP to hero ${heroId}, new level: ${updatedHero.level}`);
-                            }
-
-                            if (hpDelta !== 0) {
-                                if (hpDelta > 0) {
-                                    await sendLog(heroId, 1, 'hp_healed', { hero_id: heroId, hp_healed: hpDelta });
-                                    console.log(`Healed ${hpDelta} HP for hero ${heroId}`);
-                                } else {
-                                    await sendLog(heroId, 1, 'hp_lost', { hero_id: heroId, hp_lost: Math.abs(hpDelta) });
-                                    console.log(`Lost ${Math.abs(hpDelta)} HP for hero ${heroId}`);
-                                }
-                            }
-
-                            console.log(`Updated hero ${heroId}: xp=${xpDelta}, hp=${hpDelta}`);
-                            break;
+                            await sendLog(heroId, 1, 'hero_stats_updated', { 
+                                hero_id: heroId, 
+                                current_hp: currentHp, 
+                                max_hp: maxHp,
+                                xp_gained: xpGained,
+                                new_level: updatedHero.level
+                            });
+                            console.log(`Updated hero ${heroId}: HP ${currentHp}/${maxHp}, XP +${xpGained}, Level ${updatedHero.level}`);
                         }
-                        default:
-                            console.warn(`Unknown action: ${action}`);
+                        
+                        rabbitChannel.ack(msg);
+                        return;
                     }
+                    
                 } catch (error) {
                     console.error('Error processing hero request:', error);
                 }

@@ -87,7 +87,7 @@ async function startInventoryConsumer() {
               
               if (inventoryResult.rowCount > 0) {
                 const itemsResult = await dbClient.query(
-                  'SELECT artifact_id AS "artifactId", quantity, equipped, upgrade_level AS "upgradeLevel" FROM inventory_schema.InventoryItems WHERE hero_id = $1',
+                  'SELECT id, artifact_id AS "artifactId", equipped, upgrade_level AS "upgradeLevel" FROM inventory_schema.InventoryItems WHERE hero_id = $1',
                   [heroId]
                 );
                 console.log(`Retrieved inventory for hero ${heroId}`);
@@ -117,39 +117,27 @@ async function startInventoryConsumer() {
                 console.warn('add_item called without artifactId');
                 break;
               }
-              const checkResult = await dbClient.query(
-                'SELECT quantity FROM inventory_schema.InventoryItems WHERE hero_id = $1 AND artifact_id = $2',
-                [heroId, item.artifactId]
+              await dbClient.query(
+                'INSERT INTO inventory_schema.InventoryItems (hero_id, artifact_id, equipped, upgrade_level) VALUES ($1, $2, false, $3)',
+                [heroId, item.artifactId, item.upgradeLevel || 0]
               );
 
-              if (checkResult.rowCount > 0) {
-                await dbClient.query(
-                  'UPDATE inventory_schema.InventoryItems SET quantity = quantity + $1 WHERE hero_id = $2 AND artifact_id = $3',
-                  [item.quantity || 1, heroId, item.artifactId]
-                );
-              } else {
-                await dbClient.query(
-                  'INSERT INTO inventory_schema.InventoryItems (hero_id, artifact_id, quantity, equipped) VALUES ($1, $2, $3, false)',
-                  [heroId, item.artifactId, item.quantity || 1]
-                );
-              }
-
-              await sendLog(heroId, 1, 'artifact_added', { hero_id: heroId, artifact_id: item.artifactId, quantity: item.quantity || 1 });
-              console.log(`Added artifact ${item.artifactId} (qty: ${item.quantity || 1}) to hero ${heroId}`);
+              await sendLog(heroId, 1, 'artifact_added', { hero_id: heroId, artifact_id: item.artifactId });
+              console.log(`Added artifact ${item.artifactId} to hero ${heroId}`);
               break;
             }
             case 'remove_item': {
               const item = request.artifact;
-              if (!item?.artifactId) {
-                console.warn('remove_item called without artifactId');
+              if (!item?.id) {
+                console.warn('remove_item called without id');
                 break;
               }
               await dbClient.query(
-                'DELETE FROM inventory_schema.InventoryItems WHERE hero_id = $1 AND artifact_id = $2',
-                [heroId, item.artifactId]
+                'DELETE FROM inventory_schema.InventoryItems WHERE id = $1',
+                [item.id]
               );
-              await sendLog(heroId, 1, 'item_removed', { hero_id: heroId, artifact_id: item.artifactId });
-              console.log(`Removed artifact ${item.artifactId} from hero ${heroId}`);
+              await sendLog(heroId, 1, 'item_removed', { hero_id: heroId, item_id: item.id });
+              console.log(`Removed item ${item.id} from hero ${heroId}`);
               break;
             }
               
@@ -180,25 +168,13 @@ async function startInventoryConsumer() {
               
               // Add artifacts
               for (const item of itemsToAdd) {
-                const checkResult = await dbClient.query(
-                  'SELECT quantity FROM inventory_schema.InventoryItems WHERE hero_id = $1 AND artifact_id = $2',
-                  [heroId, item.artifactId]
+                await dbClient.query(
+                  'INSERT INTO inventory_schema.InventoryItems (hero_id, artifact_id, equipped, upgrade_level) VALUES ($1, $2, false, $3)',
+                  [heroId, item.artifactId, item.upgradeLevel || 0]
                 );
                 
-                if (checkResult.rowCount > 0) {
-                  await dbClient.query(
-                    'UPDATE inventory_schema.InventoryItems SET quantity = quantity + $1 WHERE hero_id = $2 AND artifact_id = $3',
-                    [item.quantity || 1, heroId, item.artifactId]
-                  );
-                } else {
-                  await dbClient.query(
-                    'INSERT INTO inventory_schema.InventoryItems (hero_id, artifact_id, quantity, equipped) VALUES ($1, $2, $3, false)',
-                    [heroId, item.artifactId, item.quantity || 1]
-                  );
-                }
-                
-                await sendLog(heroId, 1, 'artifact_added', { hero_id: heroId, artifact_id: item.artifactId, quantity: item.quantity || 1 });
-                console.log(`Added artifact ${item.artifactId} (qty: ${item.quantity || 1}) to hero ${heroId}`);
+                await sendLog(heroId, 1, 'artifact_added', { hero_id: heroId, artifact_id: item.artifactId });
+                console.log(`Added artifact ${item.artifactId} to hero ${heroId}`);
               }
               break;
               
@@ -309,7 +285,7 @@ app.get('/api/inventory/:heroId', async (req, res) => {
     }
 
     const itemsResult = await dbClient.query(
-      'SELECT artifact_id AS "artifactId", quantity, equipped, upgrade_level AS "upgradeLevel" FROM inventory_schema.InventoryItems WHERE hero_id = $1',
+      'SELECT id, artifact_id AS "artifactId", equipped, upgrade_level AS "upgradeLevel" FROM inventory_schema.InventoryItems WHERE hero_id = $1',
       [heroId]
     );
 
@@ -349,7 +325,7 @@ app.put('/api/inventory/:heroId', async (req, res) => {
       await dbClient.query('DELETE FROM inventory_schema.InventoryItems WHERE hero_id = $1', [heroId]);
 
       const insertItemQuery = `
-        INSERT INTO inventory_schema.InventoryItems (hero_id, artifact_id, quantity, equipped)
+        INSERT INTO inventory_schema.InventoryItems (hero_id, artifact_id, equipped, upgrade_level)
         VALUES ($1, $2, $3, $4)
       `;
 
@@ -363,8 +339,8 @@ app.put('/api/inventory/:heroId', async (req, res) => {
         await dbClient.query(insertItemQuery, [
           heroId,
           item.artifactId,
-          Number.isInteger(item.quantity) ? item.quantity : 1,
-          isEquipped
+          isEquipped,
+          item.upgradeLevel || 0
         ]);
       }
 

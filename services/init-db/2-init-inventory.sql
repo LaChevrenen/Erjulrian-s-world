@@ -18,12 +18,12 @@ CREATE TABLE inventory_schema.Inventories (
 );
 
 CREATE TABLE inventory_schema.InventoryItems (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   hero_id UUID,
   artifact_id UUID,
-  quantity int,
   equipped boolean,
   upgrade_level int DEFAULT 0,
-  PRIMARY KEY (hero_id, artifact_id)
+  UNIQUE (hero_id, artifact_id, upgrade_level)
 );
 
 -- ###########################################

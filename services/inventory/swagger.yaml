@@ -90,16 +90,19 @@ components:
     InventoryItem:
       type: object
       properties:
+        id:
+          type: string
+          format: uuid
+          description: UUID of the inventory item
         artifactId:
           type: string
           format: uuid
           description: UUID of the artifact
-        quantity:
-          type: integer
         equipped:
           type: boolean
         upgradeLevel:
           type: integer
+          description: Upgrade level of the item (allows multiple copies of same artifact)
 
     CreateInventoryRequest:
       type: object

@@ -1,6 +1,7 @@
 Table InventoryItems {
-  hero_id char(36) [ref: > Inventories.hero_id]
+  id uuid [pk]
+  hero_id uuid [ref: > Inventories.hero_id]
   artifact_id uuid [ref: > Artifacts.id]
-  quantity int
   equipped boolean
+  upgrade_level int
 }

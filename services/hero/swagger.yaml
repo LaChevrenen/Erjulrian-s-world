@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Hero Service API
-  description: Hero management and stats
+  description: Hero management and stats. Note - Hero stats are updated asynchronously via RabbitMQ events from the Dungeon service after combat encounters.
   version: 1.0.0
 
 servers:

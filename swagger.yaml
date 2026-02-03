@@ -1,0 +1,885 @@
+openapi: 3.0.3
+info:
+  title: Dungeon Game Microservices API
+  description: API Gateway exposing microservices for a dungeon crawler game
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000/api
+
+tags:
+  - name: Auth
+  - name: Users
+  - name: Heroes
+  - name: Inventory
+  - name: Dungeons
+  - name: Combat
+  - name: Monsters
+  - name: Artifacts
+  - name: Logs
+
+paths:
+
+  #######################
+  # AUTH
+  #######################
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        200:
+          description: JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: User registration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        201:
+          description: User created
+
+  #######################
+  # USERS SERVICE
+  #######################
+  /users:
+    get:
+      tags: [Users]
+      summary: List users
+      responses:
+        200:
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get user details
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        200:
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    put:
+      tags: [Users]
+      summary: Update user
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        200:
+          description: User updated
+    delete:
+      tags: [Users]
+      summary: Delete user
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        204:
+          description: User deleted
+
+  #######################
+  # HERO SERVICE
+  #######################
+  /heroes:
+    post:
+      tags: [Heroes]
+      summary: Create a hero
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHeroRequest'
+      responses:
+        201:
+          description: Hero created
+
+  /heroes/{heroId}:
+    get:
+      tags: [Heroes]
+      summary: Get hero info
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      responses:
+        200:
+          description: Hero stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeroStats'
+    put:
+      tags: [Heroes]
+      summary: Update hero info
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateHeroRequest'
+      responses:
+        200:
+          description: Hero updated
+    delete:
+      tags: [Heroes]
+      summary: Delete a hero
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      responses:
+        204:
+          description: Hero deleted
+
+
+  #######################
+  # INVENTORY SERVICE
+  #######################
+  /inventory:
+    post:
+      tags: [Inventory]
+      summary: Create inventory for hero
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInventoryRequest'
+      responses:
+        201:
+          description: Inventory created
+
+  /inventory/{heroId}:
+    get:
+      tags: [Inventory]
+      summary: Get hero inventory
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      responses:
+        200:
+          description: Inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+    put:
+      tags: [Inventory]
+      summary: Update entire hero inventory
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInventoryRequest'
+      responses:
+        200:
+          description: Inventory updated
+    delete:
+      tags: [Inventory]
+      summary: Delete hero inventory
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      responses:
+        204:
+          description: Inventory deleted
+
+  #######################
+  # DUNGEON SERVICE
+  #######################
+  /dungeons/start:
+    post:
+      tags: [Dungeons]
+      summary: Start a dungeon run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartDungeonRequest'
+      responses:
+        201:
+          description: Dungeon run created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DungeonRun'
+
+  /dungeons/{runId}:
+    get:
+      tags: [Dungeons]
+      summary: Get dungeon run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        200:
+          description: Dungeon run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DungeonRun'
+
+  /dungeons/{runId}/choices:
+    get:
+      tags: [Dungeons]
+      summary: Get available room choices
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        200:
+          description: Available room choices
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomChoices'
+
+  /dungeons/{runId}/choose:
+    post:
+      tags: [Dungeons]
+      summary: Choose next room from available options
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChooseRoomRequest'
+      responses:
+        200:
+          description: Room chosen and entered
+
+  /dungeons/{runId}/finish:
+    post:
+      tags: [Dungeons]
+      summary: Finish dungeon run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        200:
+          description: Dungeon completed
+
+  #######################
+  # COMBAT SERVICE
+  #######################
+  /combat/resolve:
+    post:
+      tags: [Combat]
+      summary: Resolve a combat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CombatRequest'
+      responses:
+        200:
+          description: Combat result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CombatResult'
+
+  #######################
+  # ARTIFACTS
+  #######################
+  /artifacts:
+    get:
+      tags: [Artifacts]
+      summary: List artifacts
+      responses:
+        200:
+          description: Artifacts list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Artifact'
+    post:
+      tags: [Artifacts]
+      summary: Create an artifact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateArtifactRequest'
+      responses:
+        201:
+          description: Artifact created
+
+  /artifacts/{artifactId}:
+    get:
+      tags: [Artifacts]
+      summary: Get artifact details
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        200:
+          description: Artifact
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artifact'
+    put:
+      tags: [Artifacts]
+      summary: Update artifact
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateArtifactRequest'
+      responses:
+        200:
+          description: Artifact updated
+    delete:
+      tags: [Artifacts]
+      summary: Delete artifact
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        204:
+          description: Artifact deleted
+
+  #######################
+  # MONSTERS
+  #######################
+  /monsters:
+    get:
+      tags: [Monsters]
+      summary: List monsters
+      responses:
+        200:
+          description: Monsters list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Monster'
+
+  /monsters/{monsterId}:
+    get:
+      tags: [Monsters]
+      summary: Get monster details
+      parameters:
+        - name: monsterId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Monster
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Monster'
+
+  #######################
+  # LOGS
+  #######################
+  /logs:
+    get:
+      tags: [Logs]
+      summary: List logs
+      parameters:
+        - name: level
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: service
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: eventType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        200:
+          description: Logs list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+    post:
+      tags: [Logs]
+      summary: Create a log entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLogRequest'
+      responses:
+        201:
+          description: Log created
+
+  /logs/{logId}:
+    get:
+      tags: [Logs]
+      summary: Get log details
+      parameters:
+        - $ref: '#/components/parameters/LogId'
+      responses:
+        200:
+          description: Log entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogEntry'
+
+components:
+
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    HeroId:
+      name: heroId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    ArtifactId:
+      name: artifactId
+      in: path
+      required: true
+      schema:
+        type: integer
+
+    LogId:
+      name: logId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        username:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        username:
+          type: string
+
+    CreateHeroRequest:
+      type: object
+      properties:
+        name:
+          type: string
+
+    UpdateHeroRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        level:
+          type: integer
+        xp:
+          type: integer
+        stats:
+          $ref: '#/components/schemas/Stats'
+
+    HeroStats:
+      type: object
+      properties:
+        heroId:
+          type: string
+        level:
+          type: integer
+        xp:
+          type: integer
+        stats:
+          $ref: '#/components/schemas/Stats'
+
+    AddXpRequest:
+      type: object
+      properties:
+        xp:
+          type: integer
+
+    Stats:
+      type: object
+      properties:
+        hp:
+          type: integer
+        att:
+          type: integer
+        def:
+          type: integer
+        regen:
+          type: integer
+
+    Inventory:
+      type: object
+      properties:
+        gold:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryItem'
+
+    InventoryItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        artifactId:
+          type: string
+          format: uuid
+        equipped:
+          type: boolean
+        upgradeLevel:
+          type: integer
+
+    InventoryItemUpsertRequest:
+      type: object
+      properties:
+        artifactId:
+          type: string
+          format: uuid
+        equipped:
+          type: boolean
+        upgradeLevel:
+          type: integer
+
+    CreateInventoryRequest:
+      type: object
+      properties:
+        heroId:
+          type: string
+
+    UpdateInventoryRequest:
+      type: object
+      properties:
+        heroId:
+          type: string
+        gold:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryItem'
+
+    StartDungeonRequest:
+      type: object
+      properties:
+        heroId:
+          type: string
+
+    DungeonRun:
+      type: object
+      properties:
+        runId:
+          type: string
+        heroId:
+          type: string
+        status:
+          type: string
+        position:
+          $ref: '#/components/schemas/Position'
+        rooms:
+          type: array
+          items:
+            $ref: '#/components/schemas/DungeonRoom'
+
+    Position:
+      type: object
+      properties:
+        floor:
+          type: integer
+        room:
+          type: integer
+
+    DungeonRoom:
+      type: object
+      properties:
+        floor:
+          type: integer
+        room:
+          type: integer
+        type:
+          type: string
+        monsterId:
+          type: string
+
+    RoomChoice:
+      type: object
+      properties:
+        roomIndex:
+          type: integer
+          description: Index of the room in the dungeon
+        type:
+          type: string
+
+    RoomChoices:
+      type: object
+      properties:
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoomChoice'
+          minItems: 0
+          maxItems: 2
+
+    ChooseRoomRequest:
+      type: object
+      properties:
+        choiceIndex:
+          type: integer
+          description: Index of the chosen room (0 or 1)
+          enum: [0, 1]
+
+    CombatRequest:
+      type: object
+      properties:
+        hero:
+          $ref: '#/components/schemas/HeroStats'
+        monster:
+          $ref: '#/components/schemas/Monster'
+
+    CombatResult:
+      type: object
+      properties:
+        result:
+          type: string
+          enum: [win, lose]
+        loot:
+          type: array
+          items:
+            $ref: '#/components/schemas/LootItem'
+
+    Artifact:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        level:
+          type: integer
+        hpBuff:
+          type: integer
+        attBuff:
+          type: integer
+        defBuff:
+          type: integer
+        regenBuff:
+          type: integer
+        description:
+          type: string
+
+    CreateArtifactRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        level:
+          type: integer
+        hpBuff:
+          type: integer
+        attBuff:
+          type: integer
+        defBuff:
+          type: integer
+        regenBuff:
+          type: integer
+        description:
+          type: string
+
+    UpdateArtifactRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        level:
+          type: integer
+        hpBuff:
+          type: integer
+        attBuff:
+          type: integer
+        defBuff:
+          type: integer
+        regenBuff:
+          type: integer
+        description:
+          type: string
+
+    CreateLogRequest:
+      type: object
+      properties:
+        level:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        service:
+          type: string
+        eventType:
+          type: string
+        payload:
+          type: object
+
+    LogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        level:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        service:
+          type: string
+        eventType:
+          type: string
+        payload:
+          type: object
+
+    LootItem:
+      type: object
+      properties:
+        artifactId:
+          type: integer
+        chance:
+          type: number
+          description: Probability in percentage (0-100)
+        amount:
+          type: integer
+          description: Quantity of the item dropped
+
+    Monster:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        description:
+          type: string
+        stats:
+          $ref: '#/components/schemas/Stats'
+        lootTable:
+          type: array
+          items:
+            $ref: '#/components/schemas/LootItem'

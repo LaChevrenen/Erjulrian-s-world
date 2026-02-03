@@ -176,6 +176,9 @@ components:
           properties:
             hp:
               type: integer
+            current_hp:
+              type: integer
+              description: Current HP of the hero (used for damage calculations)
             att:
               type: integer
             def:

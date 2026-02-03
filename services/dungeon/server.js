@@ -172,6 +172,7 @@ function computeHeroStats(heroSnapshot, equippedArtifacts) {
         xp: Number(heroSnapshot?.xp) || 0,
         stats: {
             hp: (Number(base.hp) || 0) + bonuses.hp,
+            current_hp: Number(heroSnapshot?.stats?.current_hp) || (Number(base.hp) || 0) + bonuses.hp,
             att: (Number(base.att) || 0) + bonuses.att,
             def: (Number(base.def) || 0) + bonuses.def,
             regen: (Number(base.regen) || 0) + bonuses.regen
@@ -227,8 +228,9 @@ async function startCombatResultConsumer() {
                     console.log('Combat result received:', battleResult);
 
                     const runId = battleResult.runId;
-                    const heroId = battleResult.hero?.heroId;
+                    const heroId = battleResult.heroId || battleResult.hero?.heroId;
                     const damageDealt = battleResult.damageDealt || 0;
+                    const xpGained = battleResult.xpGained || 0;
 
                     if (!runId || !heroId) {
                         console.warn('Combat result missing runId or heroId');
@@ -252,6 +254,16 @@ async function startCombatResultConsumer() {
                         console.log(`Updated hero ${heroId} HP in dungeon ${runId}: -${damageDealt} HP (new: ${newHp})`);
                         
                         await dungeon.save();
+                        
+                        // Publish hero stats update to hero service
+                        await publishEvent('hero_queue', {
+                            type: 'hero_stats_updated',
+                            heroId: heroId,
+                            currentHp: newHp,
+                            maxHp: dungeon.heroSnapshot.stats.hp,
+                            xpGained: xpGained,
+                            timestamp: new Date()
+                        });
                         
                         // Invalidate cache
                         await clearCachedDungeon(runId);
@@ -284,10 +296,34 @@ async function generateDungeonStructure() {
     }
 
     const rooms = [];
-    for (let floor = 0; floor < 3; floor++) {
-        for (let room = 0; room < 5; room++) {
-            const type = getRandomRoomType();
-            const monsterId = type === 'rest' ? null : pickRandomMonsterId();
+    const FLOORS = 3;
+    const ROOMS_PER_FLOOR = 5;
+    
+    // Generate all rooms with proper types
+    for (let floor = 0; floor < FLOORS; floor++) {
+        for (let room = 0; room < ROOMS_PER_FLOOR; room++) {
+            let type;
+            let monsterId = null;
+            
+            // First room is always rest
+            if (floor === 0 && room === 0) {
+                type = 'rest';
+            }
+            // Last room of each floor
+            else if (room === ROOMS_PER_FLOOR - 1) {
+                // Boss rooms: 2x elite-combat for first 2 floors, boss for last floor
+                type = floor === FLOORS - 1 ? 'boss' : 'elite-combat';
+                monsterId = pickRandomMonsterId();
+            }
+            // Middle rooms: mix of combat and rest
+            else {
+                // 60% combat, 40% rest
+                type = Math.random() < 0.6 ? 'combat' : 'rest';
+                if (type === 'combat') {
+                    monsterId = pickRandomMonsterId();
+                }
+            }
+            
             rooms.push({
                 floor,
                 room,
@@ -297,70 +333,88 @@ async function generateDungeonStructure() {
             });
         }
     }
-    rooms[0].type = 'rest'; // First room is always rest (safe)
+    
+    // Mark starting room as visited
     rooms[0].visited = true;
-    rooms[0].monsterId = null;
     return rooms;
 }
 
-// Helper function to generate available choices (2 different rooms)
+// Helper function to generate available choices (2 variants of next room)
+// Linear progression: always move to next room sequentially
+// Choices differ by TYPE (combat vs rest) or MONSTER for boss rooms
 function generateChoices(currentFloor, currentRoom, allRooms) {
+    const FLOORS = 3;
+    const ROOMS_PER_FLOOR = 5;
+    const maxFloor = FLOORS - 1;
+    const maxRoom = ROOMS_PER_FLOOR - 1;
+    
+    // Check if we're at the end of dungeon
+    const isLastRoom = currentFloor === maxFloor && currentRoom === maxRoom;
+    if (isLastRoom) {
+        return []; // Boss final - no more choices
+    }
+    
+    // Calculate next room position (linear progression)
+    let nextFloor = currentFloor;
+    let nextRoom = currentRoom + 1;
+    
+    // If at end of floor, go to next floor first room
+    if (nextRoom > maxRoom) {
+        nextFloor++;
+        nextRoom = 0;
+    }
+    
+    // Get the base room template
+    const nextRoomTemplate = allRooms.find(r => r.floor === nextFloor && r.room === nextRoom);
+    if (!nextRoomTemplate) return [];
+    
+    // Generate 2 variants of this room (2 different monsters or types)
     const choices = [];
-    const maxFloor = 2; // 3 floors (0, 1, 2)
-    const maxRoom = 4;  // 5 rooms (0-4)
     
-    // Find next accessible rooms
-    const nextRooms = [];
-    
-    // Option 1: Next room on same floor
-    if (currentRoom < maxRoom) {
-        const nextRoom = allRooms.find(r => r.floor === currentFloor && r.room === currentRoom + 1);
-        if (nextRoom) {
-            nextRooms.push(nextRoom);
-        }
-    } else if (currentFloor < maxFloor) {
-        // Go to next floor, first room
-        const nextFloorRoom = allRooms.find(r => r.floor === currentFloor + 1 && r.room === 0);
-        if (nextFloorRoom) {
-            nextRooms.push(nextFloorRoom);
-        }
+    // For boss rooms (room 4), always offer 2 different bosses
+    if (nextRoom === maxRoom) {
+        // Last room of floor - always boss
+        const boss1Monster = pickRandomMonsterId();
+        const boss2Monster = pickRandomMonsterId();
+        
+        choices.push({
+            floor: nextFloor,
+            room: nextRoom,
+            type: nextRoomTemplate.type, // elite-combat or boss
+            monsterId: boss1Monster,
+            visited: false
+        });
+        
+        choices.push({
+            floor: nextFloor,
+            room: nextRoom,
+            type: nextRoomTemplate.type, // Same type, different monster
+            monsterId: boss2Monster,
+            visited: false
+        });
+    } else {
+        // Regular rooms - offer 2 different types
+        const type1 = 'combat';
+        const type2 = 'rest';
+        
+        choices.push({
+            floor: nextFloor,
+            room: nextRoom,
+            type: type1,
+            monsterId: pickRandomMonsterId(),
+            visited: false
+        });
+        
+        choices.push({
+            floor: nextFloor,
+            room: nextRoom,
+            type: type2,
+            monsterId: null, // Rest rooms don't have monsters
+            visited: false
+        });
     }
     
-    // Option 2: Previous room or skip ahead
-    const alternatives = [];
-    if (currentRoom > 0) {
-        const prevRoom = allRooms.find(r => r.floor === currentFloor && r.room === currentRoom - 1);
-        if (prevRoom && !prevRoom.visited) {
-            alternatives.push(prevRoom);
-        }
-    }
-    if (currentRoom + 2 <= maxRoom) {
-        const skipRoom = allRooms.find(r => r.floor === currentFloor && r.room === currentRoom + 2);
-        if (skipRoom) {
-            alternatives.push(skipRoom);
-        }
-    }
-    
-    if (nextRooms.length > 0) {
-        choices.push(nextRooms[0]);
-    }
-    
-    if (alternatives.length > 0) {
-        const alt = alternatives[Math.floor(Math.random() * alternatives.length)];
-        if (!choices.find(c => c.floor === alt.floor && c.room === alt.room)) {
-            choices.push(alt);
-        }
-    }
-    
-    // If we don't have 2 choices yet, add any unvisited room
-    if (choices.length < 2) {
-        const unvisited = allRooms.find(r => !r.visited && !choices.find(c => c.floor === r.floor && c.room === r.room));
-        if (unvisited) {
-            choices.push(unvisited);
-        }
-    }
-    
-    return choices.slice(0, 2); // Return max 2 choices
+    return choices;
 }
 
 function buildDungeonResponse(dungeon) {
@@ -477,7 +531,8 @@ app.get('/api/dungeons/:runId/choices', async (req, res) => {
             choices: choices.map(c => ({
                 floor: c.floor,
                 room: c.room,
-                type: c.type
+                type: c.type,
+                monsterId: c.monsterId || null
             }))
         });
     } catch (error) {

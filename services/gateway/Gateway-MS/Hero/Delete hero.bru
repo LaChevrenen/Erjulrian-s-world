@@ -1,0 +1,20 @@
+meta {
+  name: Delete hero
+  type: http
+  seq: 5
+}
+
+delete {
+  url: http://localhost:3000/api/heroes/60c040b6-2df4-4455-917f-871d3b10d2bc
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjliNjM2MTNmLTY0OTYtNDUwOS1hZmNiLTc2NzBkZWRlODc2OSIsImlzQWRtaW4iOmZhbHNlLCJpYXQiOjE3NzAxMTY5MDV9.6ZoXY1qlpLvmow508NPdchA19AjO867BE7wI9J9Rhgs
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

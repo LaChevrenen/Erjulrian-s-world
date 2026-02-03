@@ -64,6 +64,9 @@ paths:
     delete:
       tags: [Dungeons]
       summary: Delete a run
+      responses:
+        204:
+          description: Dungeon run deleted
 
   /dungeons/{runId}/choices:
     get:

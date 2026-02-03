@@ -3,13 +3,6 @@
   "version": "1.0.0",
   "description": "Test scenario for Erjulrian's World",
   "main": "test-scenario.js",
-  "scripts": {
-    "test": "node test-scenario.js",
-    "test:advanced": "node test-advanced.js",
-    "test:comprehensive": "node test-comprehensive.js",
-    "test:hero-user": "node test-hero-user-separation.js",
-    "test:all": "node test-scenario.js && node test-advanced.js && node test-comprehensive.js"
-  },
   "dependencies": {
     "amqplib": "^0.10.9",
     "axios": "^1.6.0",

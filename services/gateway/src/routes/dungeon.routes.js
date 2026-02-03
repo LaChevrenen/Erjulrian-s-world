@@ -5,8 +5,13 @@ const DUNGEON_SERVICE_URL = 'http://dungeon-api:3005';
 
 const dungeonRouter = Router();
 
+
+// List runs
+dungeonRouter.get('/', auth, (req, res) => {
+    forward(req, res, DUNGEON_SERVICE_URL);
+});
 // Start dungeon run
-dungeonRouter.post('/', auth, (req, res) => {
+dungeonRouter.post('/start', auth, (req, res) => {
     forward(req, res, DUNGEON_SERVICE_URL);
 });
 // Get dungeon run

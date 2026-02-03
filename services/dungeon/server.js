@@ -372,18 +372,10 @@ function buildDungeonResponse(dungeon) {
 // POST /api/dungeons/start - Start a dungeon run
 app.post('/api/dungeons/start', async (req, res) => {
     try {
-        const { heroId, heroStats, equippedArtifacts } = req.body;
+        const { heroId } = req.body;
         
         if (!heroId) {
             return res.status(400).json({ error: 'heroId is required' });
-        }
-
-        if (!heroStats || !heroStats.stats) {
-            return res.status(400).json({ error: 'heroStats is required' });
-        }
-
-        if (!Array.isArray(equippedArtifacts)) {
-            return res.status(400).json({ error: 'equippedArtifacts must be an array' });
         }
 
         const dungeonRooms = await generateDungeonStructure();
@@ -391,7 +383,7 @@ app.post('/api/dungeons/start', async (req, res) => {
 
         const dungeon = new DungeonRun({
             heroId,
-            equippedArtifacts: Array.isArray(equippedArtifacts) ? equippedArtifacts : [],
+            equippedArtifacts: [],
             startedAt: new Date(),
             status: 'in_progress',
             position: { floor: 0, room: 0 },
@@ -448,6 +440,20 @@ app.get('/api/dungeons/:runId', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch dungeon' });
     }
 });
+
+// GET /api/dungeons - List all dungeons
+app.get('/api/dungeons', async (req, res) => {
+    try {
+        
+        const allDungeons = await DungeonRun.find();
+        res.json(allDungeons);
+    } catch (error) {
+        console.error('Error while getting all dungeons:', error);
+        res.status(500).json({ error: 'Failed to list dungeons' });
+    }
+});
+
+
 
 // GET /api/dungeons/:runId/choices - Get available room choices
 app.get('/api/dungeons/:runId/choices', async (req, res) => {

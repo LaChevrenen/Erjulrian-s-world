@@ -12,6 +12,22 @@ tags:
 
 paths:
 
+  /dungeons:
+    get:
+      tags: [Dungeons]
+      summary: List all dungeons
+      responses:
+        200:
+          description: Dungeon runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DungeonRun'
+
+
+
   /dungeons/start:
     post:
       tags: [Dungeons]
@@ -101,8 +117,6 @@ components:
       properties:
         heroId:
           type: string
-        heroStats:
-          $ref: '#/components/schemas/HeroStatsSnapshot'
         equippedArtifacts:
           type: array
           items:

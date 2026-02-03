@@ -7,6 +7,7 @@ async function loadHeroes() {
   try {
     const userId = localStorage.getItem('userId');
     heroesList = await api.get(`/api/heroes/${userId}/list`);
+    console.log(JSON.stringify(heroesList));
     displayHeroes(heroesList);
   } catch (error) {
     console.error('Erreur chargement héros:', error);
@@ -30,7 +31,10 @@ function displayHeroes(heroes) {
   container.innerHTML = heroes.map(hero => `
     <div class="hero-card">
       <p>Niveau: ${hero.level}</p>
-      <p>Classe: ${hero.class}</p>
+      <p>HP: ${hero.initial_stats.hp}</p>
+      <p>Attaque: ${hero.initial_stats.att}</p>
+      <p>Defense: ${hero.initial_stats.def}</p>
+      <p>Regen: ${hero.initial_stats.regen}</p>
       <button onclick="selectHero('${hero.id}')">Jouer</button>
       <button onclick="deleteHero('${hero.id}')">Supprimer</button>
     </div>

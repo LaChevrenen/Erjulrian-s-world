@@ -410,6 +410,63 @@ app.get('/api/inventory/:heroId/equipped_artifacts', async (req, res) => {
   }
 });
 
+// GET /api/inventory/:heroId/upgrade-info/:artifactId - Get upgrade cost info
+app.get('/api/inventory/:heroId/upgrade-info/:artifactId', async (req, res) => {
+  try {
+    const { heroId, artifactId } = req.params;
+
+    // Get current inventory gold
+    const inventoryResult = await dbClient.query(
+      'SELECT gold FROM inventory_schema.Inventories WHERE hero_id = $1',
+      [heroId]
+    );
+
+    if (inventoryResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Inventory not found' });
+    }
+
+    const currentGold = inventoryResult.rows[0].gold;
+
+    // Get artifact info and current upgrade level
+    const itemResult = await dbClient.query(
+      `SELECT ii.upgrade_level, a.level as base_level, a.name
+       FROM inventory_schema.InventoryItems ii
+       JOIN inventory_schema.Artifacts a ON ii.artifact_id = a.id
+       WHERE ii.hero_id = $1 AND ii.artifact_id = $2`,
+      [heroId, artifactId]
+    );
+
+    if (itemResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Artifact not found in inventory' });
+    }
+
+    const { upgrade_level, base_level, name } = itemResult.rows[0];
+    const nextLevel = upgrade_level + 1;
+    const maxLevel = 10;
+
+    // Calculate upgrade cost: base_level * 100 * (1 + upgrade_level)
+    const nextUpgradeCost = base_level * 100 * (1 + upgrade_level);
+    const canUpgrade = upgrade_level < maxLevel && currentGold >= nextUpgradeCost;
+
+    return res.status(200).json({
+      artifactId,
+      name,
+      currentLevel: upgrade_level,
+      nextLevel,
+      maxLevel,
+      baseLevel: base_level,
+      nextUpgradeCost,
+      currentGold,
+      canUpgrade,
+      reason: !canUpgrade ? (upgrade_level >= maxLevel ? 'Max level reached' : 'Insufficient gold') : null
+    });
+
+  } catch (error) {
+    console.error('Error getting upgrade info:', error);
+    return res.status(500).json({ error: 'Failed to get upgrade info' });
+  }
+});
+
 // POST /api/inventory/:heroId/upgrade/:artifactId - Upgrade an artifact with gold
 app.post('/api/inventory/:heroId/upgrade/:artifactId', async (req, res) => {
   try {
@@ -431,7 +488,7 @@ app.post('/api/inventory/:heroId/upgrade/:artifactId', async (req, res) => {
     const itemResult = await dbClient.query(
       `SELECT ii.upgrade_level, a.level as base_level, a.name
        FROM inventory_schema.InventoryItems ii
-       JOIN game_schema.Artifacts a ON ii.artifact_id = a.id
+       JOIN inventory_schema.Artifacts a ON ii.artifact_id = a.id
        WHERE ii.hero_id = $1 AND ii.artifact_id = $2`,
       [heroId, artifactId]
     );

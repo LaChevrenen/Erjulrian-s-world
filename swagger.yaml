@@ -215,6 +215,66 @@ paths:
         204:
           description: Inventory deleted
 
+  /inventory/{heroId}/equipped_artifacts:
+    get:
+      tags: [Inventory]
+      summary: Get hero equipped artifacts
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      responses:
+        200:
+          description: Equipped artifacts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EquippedArtifacts'
+
+  /inventory/{heroId}/upgrade-info/{artifactId}:
+    get:
+      tags: [Inventory]
+      summary: Get artifact upgrade cost and info
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Upgrade cost information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpgradeInfo'
+        404:
+          description: Artifact or inventory not found
+
+  /inventory/{heroId}/upgrade/{artifactId}:
+    post:
+      tags: [Inventory]
+      summary: Upgrade an artifact with gold
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Artifact upgraded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpgradeResponse'
+        400:
+          description: Cannot upgrade (insufficient gold or max level reached)
+        404:
+          description: Artifact or inventory not found
+
   #######################
   # DUNGEON SERVICE
   #######################
@@ -629,6 +689,8 @@ components:
       properties:
         gold:
           type: integer
+        equippedCount:
+          type: integer
         items:
           type: array
           items:
@@ -676,6 +738,79 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InventoryItem'
+
+    EquippedArtifacts:
+      type: object
+      properties:
+        equippedCount:
+          type: integer
+          description: Total count of equipped artifacts
+        items:
+          type: array
+          description: List of equipped artifact items
+          items:
+            type: object
+            properties:
+              artifactId:
+                type: string
+                format: uuid
+                description: UUID of the artifact
+              upgradeLevel:
+                type: integer
+                description: Upgrade level of the equipped item
+
+    UpgradeInfo:
+      type: object
+      properties:
+        artifactId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Name of the artifact
+        currentLevel:
+          type: integer
+          description: Current upgrade level
+        nextLevel:
+          type: integer
+          description: Next upgrade level
+        maxLevel:
+          type: integer
+          description: Maximum upgrade level (10)
+        baseLevel:
+          type: integer
+          description: Base level of the artifact
+        nextUpgradeCost:
+          type: integer
+          description: Cost in gold for next upgrade
+        currentGold:
+          type: integer
+          description: Current gold in inventory
+        canUpgrade:
+          type: boolean
+          description: Whether the hero can upgrade this artifact
+        reason:
+          type: string
+          nullable: true
+          description: Reason why upgrade is not possible
+
+    UpgradeResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        artifact:
+          type: string
+          description: Name of the upgraded artifact
+        newUpgradeLevel:
+          type: integer
+          description: New upgrade level
+        costPaid:
+          type: integer
+          description: Gold spent on upgrade
+        remainingGold:
+          type: integer
+          description: Gold remaining after upgrade
 
     StartDungeonRequest:
       type: object

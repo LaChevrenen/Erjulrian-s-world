@@ -25,6 +25,13 @@ const dbConfig = {
     database: process.env.DB_NAME || 'erjulrian_db'
 };
 
+// game constants
+const FLOORS = 3;
+const ROOMS_PER_FLOOR = 5;
+const maxFloor = FLOORS - 1;
+const maxRoom = ROOMS_PER_FLOOR - 1;
+const OPTION_NUMBER = 2;
+
 // Load Swagger documentation
 const swaggerDocument = YAML.load('./swagger.yaml');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
@@ -279,45 +286,47 @@ async function generateDungeonStructure() {
     }
 
     const rooms = [];
-    const FLOORS = 3;
-    const ROOMS_PER_FLOOR = 5;
     
     // Generate all rooms with proper types
     for (let floor = 0; floor < FLOORS; floor++) {
         for (let room = 0; room < ROOMS_PER_FLOOR; room++) {
-            let type;
-            let monsterId = null;
+            for(let choiceNumber = 0; choiceNumber < OPTION_NUMBER; choiceNumber++)
+            {
+                let type;
+                let monsterId = null;
             
-            // First room is always rest
-            if (floor === 0 && room === 0) {
-                type = 'rest';
-            }
-            // Last room of last floor is final boss (use FINAL BOSS monster)
-            else if (floor === FLOORS - 1 && room === ROOMS_PER_FLOOR - 1) {
-                type = 'boss';
-                monsterId = pickRandomFinalBossMonsterId();
-            }
-            // Last room of other floors is elite combat (use regular boss)
-            else if (room === ROOMS_PER_FLOOR - 1) {
-                type = 'elite-combat';
-                monsterId = pickRandomBossMonsterId();
-            }
-            // Middle rooms: mix of combat and rest (use normal monsters)
-            else {
-                // 60% combat, 40% rest
-                type = Math.random() < 0.6 ? 'combat' : 'rest';
-                if (type === 'combat') {
-                    monsterId = pickRandomNormalMonsterId();
+                // First room is always rest
+                if (floor === 0 && room === 0) {
+                    type = 'rest';
                 }
-            }
+                // Last room of last floor is final boss (use FINAL BOSS monster)
+                else if (floor === FLOORS - 1 && room === ROOMS_PER_FLOOR - 1) {
+                    type = 'boss';
+                    monsterId = pickRandomFinalBossMonsterId();
+                }
+                // Last room of other floors is elite combat (use regular boss)
+                else if (room === ROOMS_PER_FLOOR - 1) {
+                    type = 'elite-combat';
+                    monsterId = pickRandomBossMonsterId();
+                }
+                // Middle rooms: mix of combat and rest (use normal monsters)
+                else {
+                    // 75% combat, 25% rest
+                    type = Math.random() < 0.75 ? 'combat' : 'rest';
+                    if (type === 'combat') {
+                        monsterId = pickRandomNormalMonsterId();
+                    }
+                }
             
-            rooms.push({
-                floor,
-                room,
-                type,
-                monsterId,
-                visited: false
-            });
+                rooms.push({
+                    floor,
+                    room,
+                    choiceNumber,
+                    type,
+                    monsterId,
+                    visited: false
+                });
+            }
         }
     }
     
@@ -329,18 +338,7 @@ async function generateDungeonStructure() {
 // Helper function to generate available choices (2 variants of next room)
 // Linear progression: always move to next room sequentially
 // Choices differ by TYPE (combat vs rest) or MONSTER for boss rooms
-function generateChoices(currentFloor, currentRoom, allRooms) {
-    const FLOORS = 3;
-    const ROOMS_PER_FLOOR = 5;
-    const maxFloor = FLOORS - 1;
-    const maxRoom = ROOMS_PER_FLOOR - 1;
-    
-    // Check if we're at the end of dungeon (final boss room)
-    const isLastRoom = currentFloor === maxFloor && currentRoom === maxRoom;
-    if (isLastRoom) {
-        return []; // Final boss reached - no more choices
-    }
-    
+function getChoices(currentFloor, currentRoom, allRooms) {    
     // Calculate next room position (linear progression)
     let nextFloor = currentFloor;
     let nextRoom = currentRoom + 1;
@@ -352,72 +350,9 @@ function generateChoices(currentFloor, currentRoom, allRooms) {
     }
     
     // Get the base room template
-    const nextRoomTemplate = allRooms.find(r => r.floor === nextFloor && r.room === nextRoom);
-    if (!nextRoomTemplate) return [];
+    const choices = allRooms.filter(r => r.floor === nextFloor && r.room === nextRoom);
+    if (choices.length === 0) return [];
     
-    // Generate 2 variants of this room
-    const choices = [];
-    
-    // For final boss room (floor 2, room 4), offer 2 different FINAL BOSSES
-    if (nextFloor === maxFloor && nextRoom === maxRoom) {
-        const finalBoss1 = pickRandomFinalBossMonsterId();
-        const finalBoss2 = pickRandomFinalBossMonsterId();
-        
-        choices.push({
-            floor: nextFloor,
-            room: nextRoom,
-            type: 'boss',
-            monsterId: finalBoss1,
-            visited: false
-        });
-        
-        choices.push({
-            floor: nextFloor,
-            room: nextRoom,
-            type: 'boss',
-            monsterId: finalBoss2,
-            visited: false
-        });
-    }
-    // For elite combat (room 4 of floors 0-1), offer 2 different regular bosses
-    else if (nextRoom === maxRoom) {
-        const boss1 = pickRandomBossMonsterId();
-        const boss2 = pickRandomBossMonsterId();
-        
-        choices.push({
-            floor: nextFloor,
-            room: nextRoom,
-            type: 'elite-combat',
-            monsterId: boss1,
-            visited: false
-        });
-        
-        choices.push({
-            floor: nextFloor,
-            room: nextRoom,
-            type: 'elite-combat',
-            monsterId: boss2,
-            visited: false
-        });
-    }
-    // For regular rooms, offer 2 different types (combat vs rest)
-    else {
-        choices.push({
-            floor: nextFloor,
-            room: nextRoom,
-            type: 'combat',
-            monsterId: pickRandomNormalMonsterId(),
-            visited: false
-        });
-        
-        choices.push({
-            floor: nextFloor,
-            room: nextRoom,
-            type: 'rest',
-            monsterId: null,
-            visited: false
-        });
-    }
     
     return choices;
 }
@@ -464,6 +399,7 @@ app.post('/api/dungeons/start', async (req, res) => {
             visitedRooms: [startingRoom]
         });
 
+        // Save data into MongoDB
         await dungeon.save();
 
         // Retrieve fresh copy to ensure ID is correct
@@ -529,7 +465,7 @@ app.get('/api/dungeons/:runId/choices', async (req, res) => {
             return res.status(400).json({ error: 'Dungeon run is not in progress' });
         }
 
-        const choices = generateChoices(dungeon.position.floor, dungeon.position.room, dungeon.rooms);
+        const choices = getChoices(dungeon.position.floor, dungeon.position.room, dungeon.rooms);
 
         res.json({
             choices: choices.map(c => ({
@@ -569,7 +505,7 @@ app.post('/api/dungeons/:runId/choose', async (req, res) => {
             return res.status(400).json({ error: 'Dungeon run is not in progress' });
         }
 
-        const choices = generateChoices(dungeon.position.floor, dungeon.position.room, dungeon.rooms);
+        const choices = getChoices(dungeon.position.floor, dungeon.position.room, dungeon.rooms);
 
         if (choiceIndex >= choices.length) {
             return res.status(400).json({ error: 'Invalid choice index' });

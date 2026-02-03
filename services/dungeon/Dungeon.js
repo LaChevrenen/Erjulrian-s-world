@@ -9,6 +9,11 @@ const roomSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    choiceNumber: 
+    {
+        type: Number,
+        required: true
+    },
     type: {
         type: String,
         enum: ['combat', 'elite-combat', 'rest', 'boss'],

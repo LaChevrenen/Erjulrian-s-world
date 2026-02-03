@@ -505,6 +505,24 @@ app.get('/api/dungeons/:runId', async (req, res) => {
     }
 });
 
+// DELETE /api/dungeons/:runId - Delete dungeon run
+app.delete('/api/dungeons/:runId', async (req, res) => {
+    try {
+        const { runId } = req.params;
+
+        const dungeon = await DungeonRun.deleteOne({_id: runId});
+
+        if (!dungeon) {
+            return res.status(404).json({ error: 'Dungeon run not found' });
+        }
+
+        res.json({deleted: runId});
+    } catch (error) {
+        console.error('Error fetching dungeon:', error);
+        res.status(500).json({ error: 'Failed to fetch dungeon' });
+    }
+});
+
 // GET /api/dungeons - List all dungeons
 app.get('/api/dungeons', async (req, res) => {
     try {

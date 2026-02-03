@@ -18,6 +18,10 @@ dungeonRouter.post('/start', auth, (req, res) => {
 dungeonRouter.get('/:runId', auth, (req, res) => {
     forward(req, res, DUNGEON_SERVICE_URL);
 });
+// Delete dungeon run
+dungeonRouter.delete('/:runId', auth, (req, res) => {
+    forward(req, res, DUNGEON_SERVICE_URL);
+});
 // Get available room choices
 dungeonRouter.get('/:runId/choices', auth, (req, res) => {
     forward(req, res, DUNGEON_SERVICE_URL);

@@ -59,6 +59,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DungeonRun'
+    delete:
+      tags: [Dungeons]
+      summary: Delete a run
 
   /dungeons/{runId}/choices:
     get:

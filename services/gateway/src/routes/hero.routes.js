@@ -25,5 +25,9 @@ heroRouter.delete('/:heroId', auth, (req, res) => {
 heroRouter.post('/:heroId/xp', auth, (req, res) => {
     forward(req, res, HERO_SERVICE_URL);
 });
+// List all heroes
+heroRouter.get('/:userId/list', auth, (req, res) => {
+    forward(req, res, HERO_SERVICE_URL);
+});
 
 export default heroRouter;

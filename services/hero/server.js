@@ -266,7 +266,7 @@ app.get('/api/heroes/:heroId', async (req, res) => {
 });
 
 // GET /api/users/:userId/heroes - Get all heroes for a user
-app.get('/api/users/:userId/heroes', async (req, res) => {
+app.get('/api/heroes/:userId/list', async (req, res) => {
     try {
         const { userId } = req.params;
         if (!isUuid(userId)) {

@@ -63,19 +63,37 @@ function displayHeroes(heroes) {
     return;
   }
   
-  container.innerHTML = heroes.map(hero => `
-    <div class="hero-card" 
-     data-hero-id="${hero.hero_id}"
-     data-current-run-id="${hero.currentRun?._id || ''}">
-      <p>ID: ${hero.hero_id}</p>
-      <p>Niveau: ${hero.level}</p>
-      <p>HP: ${hero.current_hp}/${hero.base_hp}</p>
-      <p>Attaque: ${hero.base_att} | Défense: ${hero.base_def}</p>
-      <input id="currentRunId" type="hidden" value="${hero.currentRun?.id || ''}">
-      <button onclick="selectHero('${hero.hero_id}')">Jouer</button>
-      <button onclick="deleteHero('${hero.hero_id}')">Supprimer</button>
-    </div>
-  `).join('');
+  container.innerHTML = heroes.map((hero) => {
+    if(hero.currentRun?._id) {
+      return `
+      <div class="hero-card" 
+      data-hero-id="${hero.hero_id}"
+      data-current-run-id="${hero.currentRun?._id || ''}">
+        <p>ID: ${hero.hero_id}</p>
+        <p>Niveau: ${hero.level}</p>
+        <p>HP: ${hero.current_hp}/${hero.base_hp}</p>
+        <p>Attaque: ${hero.base_att} | Défense: ${hero.base_def}</p>
+        <input id="currentRunId" type="hidden" value="${hero.currentRun?.id || ''}">
+        <button onclick="selectHero('${hero.hero_id}')">Continuer la partie</button>
+        <button onclick="deleteHero('${hero.hero_id}')">Supprimer</button>
+      </div>
+    `
+    } else {
+        return `
+      <div class="hero-card" 
+      data-hero-id="${hero.hero_id}"
+      data-current-run-id="${hero.currentRun?._id || ''}">
+        <p>ID: ${hero.hero_id}</p>
+        <p>Niveau: ${hero.level}</p>
+        <p>HP: ${hero.current_hp}/${hero.base_hp}</p>
+        <p>Attaque: ${hero.base_att} | Défense: ${hero.base_def}</p>
+        <input id="currentRunId" type="hidden" value="${hero.currentRun?.id || ''}">
+        <button onclick="selectHero('${hero.hero_id}')">Jouer</button>
+        <button onclick="deleteHero('${hero.hero_id}')">Supprimer</button>
+      </div>
+    `
+    }
+  } ).join('');
 }
 
 async function createHero() {

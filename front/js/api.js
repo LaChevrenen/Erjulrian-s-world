@@ -23,6 +23,13 @@ async function apiRequest(endpoint, options = {}) {
   try {
     const response = await fetch(`${API_URL}${endpoint}`, config);
     
+    if(config.method === "DELETE" || response === 204) {
+      if(!response.ok) {
+        throw new CustomError(`Erreur ${response.status}: ${response.statusText}`, response.status);
+      }
+      return {success: true};
+    }
+
     if (!response.ok) {
       throw new CustomError(`Erreur ${response.status}: ${response.statusText}`, response.status);
     }

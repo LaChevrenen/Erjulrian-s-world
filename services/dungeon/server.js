@@ -152,34 +152,6 @@ async function getMonsterWithLoot(monsterId) {
     };
 }
 
-function computeHeroStats(heroSnapshot, equippedArtifacts) {
-    const base = heroSnapshot?.stats || { hp: 0, att: 0, def: 0, regen: 0 };
-    const artifacts = Array.isArray(equippedArtifacts) ? equippedArtifacts : [];
-
-    const bonuses = artifacts.reduce(
-        (acc, item) => {
-            acc.hp += Number(item.hp_buff) || 0;
-            acc.att += Number(item.att_buff) || 0;
-            acc.def += Number(item.def_buff) || 0;
-            acc.regen += Number(item.regen_buff) || 0;
-            return acc;
-        },
-        { hp: 0, att: 0, def: 0, regen: 0 }
-    );
-
-    return {
-        level: Number(heroSnapshot?.level) || 1,
-        xp: Number(heroSnapshot?.xp) || 0,
-        stats: {
-            hp: (Number(base.hp) || 0) + bonuses.hp,
-            current_hp: Number(heroSnapshot?.stats?.current_hp) || (Number(base.hp) || 0) + bonuses.hp,
-            att: (Number(base.att) || 0) + bonuses.att,
-            def: (Number(base.def) || 0) + bonuses.def,
-            regen: (Number(base.regen) || 0) + bonuses.regen
-        }
-    };
-}
-
 // RabbitMQ publisher setup
 let channel;
 
@@ -229,8 +201,6 @@ async function startCombatResultConsumer() {
 
                     const runId = battleResult.runId;
                     const heroId = battleResult.heroId || battleResult.hero?.heroId;
-                    const damageDealt = battleResult.damageDealt || 0;
-                    const xpGained = battleResult.xpGained || 0;
 
                     if (!runId || !heroId) {
                         console.warn('Combat result missing runId or heroId');
@@ -238,7 +208,7 @@ async function startCombatResultConsumer() {
                         return;
                     }
 
-                    // Find dungeon run and update hero snapshot HP
+                    // Find dungeon run
                     const dungeon = await DungeonRun.findById(runId);
                     if (!dungeon) {
                         console.warn(`Dungeon run ${runId} not found`);
@@ -246,28 +216,10 @@ async function startCombatResultConsumer() {
                         return;
                     }
 
-                    // Apply damage to current_hp
-                    if (dungeon.heroSnapshot && dungeon.heroSnapshot.stats) {
-                        const newHp = Math.max(0, (dungeon.heroSnapshot.stats.current_hp || dungeon.heroSnapshot.stats.hp) - damageDealt);
-                        dungeon.heroSnapshot.stats.current_hp = newHp;
-                        
-                        console.log(`Updated hero ${heroId} HP in dungeon ${runId}: -${damageDealt} HP (new: ${newHp})`);
-                        
-                        await dungeon.save();
-                        
-                        // Publish hero stats update to hero service
-                        await publishEvent('hero_queue', {
-                            type: 'hero_stats_updated',
-                            heroId: heroId,
-                            currentHp: newHp,
-                            maxHp: dungeon.heroSnapshot.stats.hp,
-                            xpGained: xpGained,
-                            timestamp: new Date()
-                        });
-                        
-                        // Invalidate cache
-                        await clearCachedDungeon(runId);
-                    }
+                    console.log(`Combat result received for dungeon ${runId}: ${battleResult.result}`);
+                    
+                    // Invalidate cache
+                    await clearCachedDungeon(runId);
 
                     channel.ack(msg);
                 } catch (error) {
@@ -451,7 +403,6 @@ app.post('/api/dungeons/start', async (req, res) => {
 
         const dungeon = new DungeonRun({
             heroId,
-            heroSnapshot: heroStats || null,
             equippedArtifacts: Array.isArray(equippedArtifacts) ? equippedArtifacts : [],
             startedAt: new Date(),
             status: 'in_progress',
@@ -545,10 +496,14 @@ app.get('/api/dungeons/:runId/choices', async (req, res) => {
 app.post('/api/dungeons/:runId/choose', async (req, res) => {
     try {
         const { runId } = req.params;
-        const { choiceIndex } = req.body;
+        const { choiceIndex, heroStats } = req.body;
 
         if (choiceIndex === undefined || ![0, 1].includes(choiceIndex)) {
             return res.status(400).json({ error: 'choiceIndex must be 0 or 1' });
+        }
+
+        if (!heroStats || typeof heroStats.hp !== 'number' || typeof heroStats.current_hp !== 'number') {
+            return res.status(400).json({ error: 'heroStats with hp, current_hp, att, def, regen is required' });
         }
 
         const dungeon = await DungeonRun.findById(runId);
@@ -605,14 +560,12 @@ app.post('/api/dungeons/:runId/choose', async (req, res) => {
                     });
                 }
 
-                const computedHero = computeHeroStats(dungeon.heroSnapshot, dungeon.equippedArtifacts);
-
                 await publishEvent('combat_queue', {
                     hero: {
                         heroId: dungeon.heroId,
-                        level: computedHero.level,
-                        xp: computedHero.xp,
-                        stats: computedHero.stats
+                        level: 1,
+                        xp: 0,
+                        stats: heroStats
                     },
                     monster,
                     runId: dungeon._id,

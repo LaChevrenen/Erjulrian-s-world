@@ -103,11 +103,17 @@ async function start() {
         }
 
         // send message to hero service to update hero xp and hp
-        battleResult.action = 'update_hero';
+        const heroUpdate = {
+            type: 'hero_stats_updated',
+            heroId: battleResult.heroId,
+            currentHp: battleResult.currentHp,
+            maxHp: combatData.hero.stats.hp,
+            xpGained: battleResult.xpDelta
+        };
         const heroQueue = 'hero_queue';
         channel.assertQueue(heroQueue, { durable: true });
-        channel.sendToQueue(heroQueue, Buffer.from(JSON.stringify(battleResult)), { persistent: true });
-        console.log("Update sent to hero service:", battleResult);
+        channel.sendToQueue(heroQueue, Buffer.from(JSON.stringify(heroUpdate)), { persistent: true });
+        console.log("Update sent to hero service:", heroUpdate);
 
         channel.ack(msg);
 
@@ -267,9 +273,7 @@ function computeBattle(combatData)
     }
     
     battleJson.heroId = combatData.hero.heroId;
-    battleJson.hpDelta = Math.max(0, heroHp);
-    // Calculate total damage dealt to hero (original HP - remaining HP)
-    battleJson.damageDealt = Math.max(0, heroMaxHp - heroHp);
+    battleJson.currentHp = Math.max(0, heroHp);
 
     return battleJson;
 }

@@ -202,8 +202,35 @@ components:
 
     ChooseRoomRequest:
       type: object
+      required:
+        - choiceIndex
+        - heroStats
       properties:
         choiceIndex:
           type: integer
           description: Index of the chosen room (0 or 1)
           enum: [0, 1]
+        heroStats:
+          type: object
+          required:
+            - hp
+            - current_hp
+            - att
+            - def
+            - regen
+          properties:
+            hp:
+              type: integer
+              description: Maximum HP (calculated with artifact bonuses)
+            current_hp:
+              type: integer
+              description: Current HP (damage taken during dungeon)
+            att:
+              type: integer
+              description: Attack stat (calculated with artifact bonuses)
+            def:
+              type: integer
+              description: Defense stat (calculated with artifact bonuses)
+            regen:
+              type: integer
+              description: Regeneration stat (calculated with artifact bonuses)

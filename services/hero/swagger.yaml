@@ -37,7 +37,7 @@ paths:
                     type: string
                     format: uuid
 
-  /heroes/:userId/list:
+  /heroes/{userId}/list:
     get:
       tags: [Heroes]
       summary: Get all heroes for a user

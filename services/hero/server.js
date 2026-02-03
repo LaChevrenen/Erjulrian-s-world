@@ -205,6 +205,23 @@ app.post('/api/heroes', async (req, res) => {
     }
 });
 
+// GET /api/heroes/:userId/list - Get all heroes for a user
+app.get('/api/heroes/:userId/list', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        if (!isUuid(userId)) {
+            return res.status(400).json({ error: 'Invalid userId format' });
+        }
+        const query = 'SELECT * FROM hero_schema.HeroStats WHERE user_id = $1 ORDER BY updated_at DESC';
+        const result = await dbClient.query(query, [userId]);
+        
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching user heroes:', error);
+        res.status(500).json({ error: 'Failed to fetch user heroes' });
+    }
+});
+
 // GET /api/heroes/:heroId - Get hero stats
 app.get('/api/heroes/:heroId', async (req, res) => {
     try {
@@ -223,23 +240,6 @@ app.get('/api/heroes/:heroId', async (req, res) => {
     } catch (error) {
         console.error('Error fetching hero:', error);
         res.status(500).json({ error: 'Failed to fetch hero' });
-    }
-});
-
-// GET /api/users/:userId/heroes - Get all heroes for a user
-app.get('/api/heroes/:userId/list', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        if (!isUuid(userId)) {
-            return res.status(400).json({ error: 'Invalid userId format' });
-        }
-        const query = 'SELECT * FROM hero_schema.HeroStats WHERE user_id = $1 ORDER BY updated_at DESC';
-        const result = await dbClient.query(query, [userId]);
-        
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Error fetching user heroes:', error);
-        res.status(500).json({ error: 'Failed to fetch user heroes' });
     }
 });
 

@@ -381,6 +381,35 @@ app.delete('/api/inventory/:heroId', async (req, res) => {
   }
 });
 
+// GET /api/inventory/:heroId/equipped_artifacts - Get equipped artifacts 
+app.get('/api/inventory/:heroId/equipped_artifacts', async (req, res) => {
+  try {
+    const { heroId } = req.params;
+
+    const inventoryResult = await dbClient.query(
+      'SELECT equipped_count FROM inventory_schema.Inventories WHERE hero_id = $1',
+      [heroId]
+    );
+
+    if (inventoryResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Inventory not found' });
+    }
+
+    const itemsResult = await dbClient.query(
+      'SELECT id, artifact_id AS "artifactId", equipped, upgrade_level AS "upgradeLevel" FROM inventory_schema.InventoryItems WHERE hero_id = $1 AND equipped = true',
+      [heroId]
+    );
+
+    return res.status(200).json({
+      equippedCount: inventoryResult.rows[0].equipped_count,
+      items: itemsResult.rows
+    });
+  } catch (error) {
+    console.error('Error fetching inventory:', error);
+    return res.status(500).json({ error: 'Failed to fetch inventory' });
+  }
+});
+
 // POST /api/inventory/:heroId/upgrade/:artifactId - Upgrade an artifact with gold
 app.post('/api/inventory/:heroId/upgrade/:artifactId', async (req, res) => {
   try {

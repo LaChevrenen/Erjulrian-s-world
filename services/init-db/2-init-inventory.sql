@@ -31,5 +31,6 @@ CREATE TABLE inventory_schema.InventoryItems (
 -- ###########################################
 
 GRANT USAGE ON SCHEMA inventory_schema TO inventory_user;
-GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA inventory_schema TO inventory_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA inventory_schema TO inventory_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA inventory_schema GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO inventory_user;
 ALTER ROLE inventory_user SET search_path TO inventory_schema, public;

@@ -62,6 +62,20 @@ paths:
         204:
           description: Inventory deleted
 
+  /inventory/{heroId}/equipped_artifacts:
+    get:
+      tags: [Inventory]
+      summary: Get hero equipped artifacts
+      parameters:
+        - $ref: '#/components/parameters/HeroId'
+      responses:
+        200:
+          description: Equipped artifacts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EquippedArtifacts'
+
 components:
 
   parameters:
@@ -125,3 +139,23 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InventoryItem'
+
+    EquippedArtifacts:
+      type: object
+      properties:
+        equippedCount:
+          type: integer
+          description: Total count of equipped artifacts
+        items:
+          type: array
+          description: List of equipped artifact items
+          items:
+            type: object
+            properties:
+              artifactId:
+                type: string
+                format: uuid
+                description: UUID of the artifact
+              upgradeLevel:
+                type: integer
+                description: Upgrade level of the equipped item

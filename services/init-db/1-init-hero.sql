@@ -32,5 +32,5 @@ CREATE INDEX idx_hero_user_id ON hero_schema.HeroStats(user_id);
 -- ###########################################
 
 GRANT USAGE ON SCHEMA hero_schema TO hero_user;
-GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA hero_schema TO hero_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA hero_schema TO hero_user;
 ALTER ROLE hero_user SET search_path TO hero_schema, public;

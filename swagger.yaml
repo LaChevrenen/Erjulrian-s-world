@@ -295,6 +295,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DungeonRun'
+        409:
+          description: Dungeon run already in progress for this hero
 
   /dungeons/{runId}:
     get:
@@ -814,9 +816,15 @@ components:
 
     StartDungeonRequest:
       type: object
+      required:
+        - heroId
       properties:
         heroId:
           type: string
+        equippedArtifacts:
+          type: array
+          items:
+            $ref: '#/components/schemas/EquippedArtifact'
 
     DungeonRun:
       type: object

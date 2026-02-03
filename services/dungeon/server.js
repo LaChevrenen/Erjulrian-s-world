@@ -378,6 +378,14 @@ app.post('/api/dungeons/start', async (req, res) => {
             return res.status(400).json({ error: 'heroId is required' });
         }
 
+        const existingRun = await DungeonRun.findOne({ heroId, status: 'in_progress' });
+        if (existingRun) {
+            return res.status(409).json({
+                error: 'Dungeon run already in progress for this hero',
+                runId: existingRun._id?.toString?.() || existingRun._id
+            });
+        }
+
         const dungeonRooms = await generateDungeonStructure();
         const startingRoom = dungeonRooms[0];
 

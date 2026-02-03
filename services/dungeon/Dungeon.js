@@ -43,16 +43,6 @@ const dungeonSchema = new mongoose.Schema({
         required: true,
         index: true
     },
-    heroSnapshot: {
-        level: { type: Number },
-        xp: { type: Number },
-        stats: {
-            hp: { type: Number },
-            att: { type: Number },
-            def: { type: Number },
-            regen: { type: Number }
-        }
-    },
     equippedArtifacts: {
         type: [
             {

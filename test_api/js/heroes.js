@@ -7,6 +7,7 @@ async function loadHeroes() {
   try {
     const userId = localStorage.getItem('userId');
     heroesList = await api.get(`/api/heroes/${userId}/list`);
+    console.log(JSON.stringify(heroesList));
     displayHeroes(heroesList);
   } catch (error) {
     console.error('Erreur chargement héros:', error);

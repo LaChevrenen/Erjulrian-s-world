@@ -1,0 +1,20 @@
+meta {
+  name: Get all dungeons
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://localhost:3000/api/dungeons
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImE5MTRjZmMzLWE0MGEtNDRhOS05OWNiLTliMDkyYTA3MzE2YSIsImlzQWRtaW4iOmZhbHNlLCJpYXQiOjE3NzAxMjY0MjR9.QZdM7dEUBGguuGNuH7EOrf9fsFS7KfMlgxN5-XSXlQQ
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

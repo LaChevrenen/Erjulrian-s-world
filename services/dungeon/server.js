@@ -88,7 +88,9 @@ async function clearCachedDungeon(runId) {
 
 // PostgreSQL connection for game data
 let dbClient;
-let monsterIdCache = [];
+let normalMonsterCache = [];    // Regular monsters (not boss)
+let bossMonsterCache = [];       // Boss monsters (type 'boss')
+let finalBossMonsterCache = [];  // Final boss monsters (type 'boss_final')
 
 async function connectPostgres() {
     try {
@@ -105,17 +107,46 @@ async function connectPostgres() {
 async function refreshMonsterCache() {
     if (!dbClient) return;
     try {
-        const result = await dbClient.query('SELECT id FROM game_schema.Monsters');
-        monsterIdCache = result.rows.map(row => row.id);
+        // Get normal monsters (not boss types)
+        const normalResult = await dbClient.query(
+            "SELECT id FROM game_schema.Monsters WHERE type NOT IN ('boss', 'boss_final')"
+        );
+        normalMonsterCache = normalResult.rows.map(row => row.id);
+        
+        // Get boss monsters (for elite-combat rooms)
+        const bossResult = await dbClient.query(
+            "SELECT id FROM game_schema.Monsters WHERE type = 'boss'"
+        );
+        bossMonsterCache = bossResult.rows.map(row => row.id);
+        
+        // Get final boss monsters (for final room only)
+        const finalBossResult = await dbClient.query(
+            "SELECT id FROM game_schema.Monsters WHERE type = 'boss_final'"
+        );
+        finalBossMonsterCache = finalBossResult.rows.map(row => row.id);
+        
+        console.log(`Monster cache refreshed: ${normalMonsterCache.length} normal, ${bossMonsterCache.length} boss, ${finalBossMonsterCache.length} final boss`);
     } catch (error) {
         console.error('Failed to refresh monster cache:', error);
     }
 }
 
-function pickRandomMonsterId() {
-    if (!monsterIdCache.length) return null;
-    const idx = Math.floor(Math.random() * monsterIdCache.length);
-    return monsterIdCache[idx];
+function pickRandomNormalMonsterId() {
+    if (!normalMonsterCache.length) return null;
+    const idx = Math.floor(Math.random() * normalMonsterCache.length);
+    return normalMonsterCache[idx];
+}
+
+function pickRandomBossMonsterId() {
+    if (!bossMonsterCache.length) return null;
+    const idx = Math.floor(Math.random() * bossMonsterCache.length);
+    return bossMonsterCache[idx];
+}
+
+function pickRandomFinalBossMonsterId() {
+    if (!finalBossMonsterCache.length) return null;
+    const idx = Math.floor(Math.random() * finalBossMonsterCache.length);
+    return finalBossMonsterCache[idx];
 }
 
 async function getMonsterWithLoot(monsterId) {
@@ -149,34 +180,6 @@ async function getMonsterWithLoot(monsterId) {
             chance: l.chance,
             amount: l.amount
         }))
-    };
-}
-
-function computeHeroStats(heroSnapshot, equippedArtifacts) {
-    const base = heroSnapshot?.stats || { hp: 0, att: 0, def: 0, regen: 0 };
-    const artifacts = Array.isArray(equippedArtifacts) ? equippedArtifacts : [];
-
-    const bonuses = artifacts.reduce(
-        (acc, item) => {
-            acc.hp += Number(item.hp_buff) || 0;
-            acc.att += Number(item.att_buff) || 0;
-            acc.def += Number(item.def_buff) || 0;
-            acc.regen += Number(item.regen_buff) || 0;
-            return acc;
-        },
-        { hp: 0, att: 0, def: 0, regen: 0 }
-    );
-
-    return {
-        level: Number(heroSnapshot?.level) || 1,
-        xp: Number(heroSnapshot?.xp) || 0,
-        stats: {
-            hp: (Number(base.hp) || 0) + bonuses.hp,
-            current_hp: Number(heroSnapshot?.stats?.current_hp) || (Number(base.hp) || 0) + bonuses.hp,
-            att: (Number(base.att) || 0) + bonuses.att,
-            def: (Number(base.def) || 0) + bonuses.def,
-            regen: (Number(base.regen) || 0) + bonuses.regen
-        }
     };
 }
 
@@ -229,8 +232,6 @@ async function startCombatResultConsumer() {
 
                     const runId = battleResult.runId;
                     const heroId = battleResult.heroId || battleResult.hero?.heroId;
-                    const damageDealt = battleResult.damageDealt || 0;
-                    const xpGained = battleResult.xpGained || 0;
 
                     if (!runId || !heroId) {
                         console.warn('Combat result missing runId or heroId');
@@ -238,7 +239,7 @@ async function startCombatResultConsumer() {
                         return;
                     }
 
-                    // Find dungeon run and update hero snapshot HP
+                    // Find dungeon run
                     const dungeon = await DungeonRun.findById(runId);
                     if (!dungeon) {
                         console.warn(`Dungeon run ${runId} not found`);
@@ -246,28 +247,10 @@ async function startCombatResultConsumer() {
                         return;
                     }
 
-                    // Apply damage to current_hp
-                    if (dungeon.heroSnapshot && dungeon.heroSnapshot.stats) {
-                        const newHp = Math.max(0, (dungeon.heroSnapshot.stats.current_hp || dungeon.heroSnapshot.stats.hp) - damageDealt);
-                        dungeon.heroSnapshot.stats.current_hp = newHp;
-                        
-                        console.log(`Updated hero ${heroId} HP in dungeon ${runId}: -${damageDealt} HP (new: ${newHp})`);
-                        
-                        await dungeon.save();
-                        
-                        // Publish hero stats update to hero service
-                        await publishEvent('hero_queue', {
-                            type: 'hero_stats_updated',
-                            heroId: heroId,
-                            currentHp: newHp,
-                            maxHp: dungeon.heroSnapshot.stats.hp,
-                            xpGained: xpGained,
-                            timestamp: new Date()
-                        });
-                        
-                        // Invalidate cache
-                        await clearCachedDungeon(runId);
-                    }
+                    console.log(`Combat result received for dungeon ${runId}: ${battleResult.result}`);
+                    
+                    // Invalidate cache
+                    await clearCachedDungeon(runId);
 
                     channel.ack(msg);
                 } catch (error) {
@@ -291,7 +274,7 @@ function getRandomRoomType() {
 
 // Helper function to generate dungeon structure (3 floors x 5 rooms)
 async function generateDungeonStructure() {
-    if (!monsterIdCache.length) {
+    if (!normalMonsterCache.length) {
         await refreshMonsterCache();
     }
 
@@ -309,18 +292,22 @@ async function generateDungeonStructure() {
             if (floor === 0 && room === 0) {
                 type = 'rest';
             }
-            // Last room of each floor
-            else if (room === ROOMS_PER_FLOOR - 1) {
-                // Boss rooms: 2x elite-combat for first 2 floors, boss for last floor
-                type = floor === FLOORS - 1 ? 'boss' : 'elite-combat';
-                monsterId = pickRandomMonsterId();
+            // Last room of last floor is final boss (use FINAL BOSS monster)
+            else if (floor === FLOORS - 1 && room === ROOMS_PER_FLOOR - 1) {
+                type = 'boss';
+                monsterId = pickRandomFinalBossMonsterId();
             }
-            // Middle rooms: mix of combat and rest
+            // Last room of other floors is elite combat (use regular boss)
+            else if (room === ROOMS_PER_FLOOR - 1) {
+                type = 'elite-combat';
+                monsterId = pickRandomBossMonsterId();
+            }
+            // Middle rooms: mix of combat and rest (use normal monsters)
             else {
                 // 60% combat, 40% rest
                 type = Math.random() < 0.6 ? 'combat' : 'rest';
                 if (type === 'combat') {
-                    monsterId = pickRandomMonsterId();
+                    monsterId = pickRandomNormalMonsterId();
                 }
             }
             
@@ -348,10 +335,10 @@ function generateChoices(currentFloor, currentRoom, allRooms) {
     const maxFloor = FLOORS - 1;
     const maxRoom = ROOMS_PER_FLOOR - 1;
     
-    // Check if we're at the end of dungeon
+    // Check if we're at the end of dungeon (final boss room)
     const isLastRoom = currentFloor === maxFloor && currentRoom === maxRoom;
     if (isLastRoom) {
-        return []; // Boss final - no more choices
+        return []; // Final boss reached - no more choices
     }
     
     // Calculate next room position (linear progression)
@@ -368,48 +355,66 @@ function generateChoices(currentFloor, currentRoom, allRooms) {
     const nextRoomTemplate = allRooms.find(r => r.floor === nextFloor && r.room === nextRoom);
     if (!nextRoomTemplate) return [];
     
-    // Generate 2 variants of this room (2 different monsters or types)
+    // Generate 2 variants of this room
     const choices = [];
     
-    // For boss rooms (room 4), always offer 2 different bosses
-    if (nextRoom === maxRoom) {
-        // Last room of floor - always boss
-        const boss1Monster = pickRandomMonsterId();
-        const boss2Monster = pickRandomMonsterId();
+    // For final boss room (floor 2, room 4), offer 2 different FINAL BOSSES
+    if (nextFloor === maxFloor && nextRoom === maxRoom) {
+        const finalBoss1 = pickRandomFinalBossMonsterId();
+        const finalBoss2 = pickRandomFinalBossMonsterId();
         
         choices.push({
             floor: nextFloor,
             room: nextRoom,
-            type: nextRoomTemplate.type, // elite-combat or boss
-            monsterId: boss1Monster,
+            type: 'boss',
+            monsterId: finalBoss1,
             visited: false
         });
         
         choices.push({
             floor: nextFloor,
             room: nextRoom,
-            type: nextRoomTemplate.type, // Same type, different monster
-            monsterId: boss2Monster,
+            type: 'boss',
+            monsterId: finalBoss2,
             visited: false
         });
-    } else {
-        // Regular rooms - offer 2 different types
-        const type1 = 'combat';
-        const type2 = 'rest';
+    }
+    // For elite combat (room 4 of floors 0-1), offer 2 different regular bosses
+    else if (nextRoom === maxRoom) {
+        const boss1 = pickRandomBossMonsterId();
+        const boss2 = pickRandomBossMonsterId();
         
         choices.push({
             floor: nextFloor,
             room: nextRoom,
-            type: type1,
-            monsterId: pickRandomMonsterId(),
+            type: 'elite-combat',
+            monsterId: boss1,
             visited: false
         });
         
         choices.push({
             floor: nextFloor,
             room: nextRoom,
-            type: type2,
-            monsterId: null, // Rest rooms don't have monsters
+            type: 'elite-combat',
+            monsterId: boss2,
+            visited: false
+        });
+    }
+    // For regular rooms, offer 2 different types (combat vs rest)
+    else {
+        choices.push({
+            floor: nextFloor,
+            room: nextRoom,
+            type: 'combat',
+            monsterId: pickRandomNormalMonsterId(),
+            visited: false
+        });
+        
+        choices.push({
+            floor: nextFloor,
+            room: nextRoom,
+            type: 'rest',
+            monsterId: null,
             visited: false
         });
     }
@@ -432,18 +437,10 @@ function buildDungeonResponse(dungeon) {
 // POST /api/dungeons/start - Start a dungeon run
 app.post('/api/dungeons/start', async (req, res) => {
     try {
-        const { heroId, heroStats, equippedArtifacts } = req.body;
+        const { heroId } = req.body;
         
         if (!heroId) {
             return res.status(400).json({ error: 'heroId is required' });
-        }
-
-        if (!heroStats || !heroStats.stats) {
-            return res.status(400).json({ error: 'heroStats is required' });
-        }
-
-        if (!Array.isArray(equippedArtifacts)) {
-            return res.status(400).json({ error: 'equippedArtifacts must be an array' });
         }
 
         const dungeonRooms = await generateDungeonStructure();
@@ -451,8 +448,7 @@ app.post('/api/dungeons/start', async (req, res) => {
 
         const dungeon = new DungeonRun({
             heroId,
-            heroSnapshot: heroStats || null,
-            equippedArtifacts: Array.isArray(equippedArtifacts) ? equippedArtifacts : [],
+            equippedArtifacts: [],
             startedAt: new Date(),
             status: 'in_progress',
             position: { floor: 0, room: 0 },
@@ -509,6 +505,20 @@ app.get('/api/dungeons/:runId', async (req, res) => {
     }
 });
 
+// GET /api/dungeons - List all dungeons
+app.get('/api/dungeons', async (req, res) => {
+    try {
+        
+        const allDungeons = await DungeonRun.find();
+        res.json(allDungeons);
+    } catch (error) {
+        console.error('Error while getting all dungeons:', error);
+        res.status(500).json({ error: 'Failed to list dungeons' });
+    }
+});
+
+
+
 // GET /api/dungeons/:runId/choices - Get available room choices
 app.get('/api/dungeons/:runId/choices', async (req, res) => {
     try {
@@ -545,10 +555,14 @@ app.get('/api/dungeons/:runId/choices', async (req, res) => {
 app.post('/api/dungeons/:runId/choose', async (req, res) => {
     try {
         const { runId } = req.params;
-        const { choiceIndex } = req.body;
+        const { choiceIndex, heroStats } = req.body;
 
         if (choiceIndex === undefined || ![0, 1].includes(choiceIndex)) {
             return res.status(400).json({ error: 'choiceIndex must be 0 or 1' });
+        }
+
+        if (!heroStats || typeof heroStats.hp !== 'number' || typeof heroStats.current_hp !== 'number') {
+            return res.status(400).json({ error: 'heroStats with hp, current_hp, att, def, regen is required' });
         }
 
         const dungeon = await DungeonRun.findById(runId);
@@ -605,14 +619,12 @@ app.post('/api/dungeons/:runId/choose', async (req, res) => {
                     });
                 }
 
-                const computedHero = computeHeroStats(dungeon.heroSnapshot, dungeon.equippedArtifacts);
-
                 await publishEvent('combat_queue', {
                     hero: {
                         heroId: dungeon.heroId,
-                        level: computedHero.level,
-                        xp: computedHero.xp,
-                        stats: computedHero.stats
+                        level: 1,
+                        xp: 0,
+                        stats: heroStats
                     },
                     monster,
                     runId: dungeon._id,

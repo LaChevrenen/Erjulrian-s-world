@@ -1,0 +1,18 @@
+{
+  "user_id": "string (UUID)",
+  "level": "info | warn | error",
+  "timestamp": "2026-02-06T18:54:21.000Z",
+  "service": "combat",
+  "eventType": "combat_start | combat_end | combat_error",
+  "payload": {
+    // For starting battle
+    "monsterName": "string",
+    "monsterType": "string",
+    // If the battle ends
+    "result": "win | lose",
+    "monsterName": "string",
+    "lootCount": 0,
+    // Error case
+    "error": "message d'erreur"
+  }
+}

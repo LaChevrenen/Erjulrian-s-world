@@ -1,0 +1,7 @@
+{
+  "type": "hero_stats_updated",
+  "heroId": "string (UUID)",
+  "currentHp": 15,
+  "maxHp": 20,
+  "xpGained": 45
+}

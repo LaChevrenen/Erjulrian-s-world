@@ -1,0 +1,10 @@
+{
+  "user_id": "string (UUID)",
+  "level": 1,
+  "timestamp": "2026-02-06T18:56:00.000Z",
+  "service": "hero",
+  "eventType": "hero_created | hero_updated | hero_deleted | ...",
+  "payload": {
+    // depends on the service 
+   }
+}

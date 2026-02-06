@@ -1,0 +1,10 @@
+{
+  "result": "win",
+  "gold": "number",
+  "xpDelta": "number",
+  "items": "array",
+  "heroId": "string",
+  "currentHp": "number",
+  "runId": "string",
+  "action": "update_inventory"
+}

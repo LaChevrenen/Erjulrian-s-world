@@ -1,0 +1,15 @@
+{
+  "result": "win | lose",
+  "gold": 120,
+  "xpDelta": 45,
+  "items": [
+    {
+      "artifactId": "string (UUID)",
+      "chance": 0.5,
+      "amount": 1
+    }
+  ],
+  "heroId": "string (UUID)",
+  "currentHp": 15,
+  "runId": "string"
+}

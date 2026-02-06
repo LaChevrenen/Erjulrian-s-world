@@ -43,16 +43,15 @@ async function connectRabbitMQ() {
     const connection = await amqp.connect(RABBITMQ_URL);
     rabbitChannel = await connection.createChannel();
     
-    // Assert queues
     const logQueue = await rabbitChannel.assertQueue('log_queue', { durable: true });
     const inventoryQueue = await rabbitChannel.assertQueue('inventory_queue', { durable: true });
     
-    console.log('✓ log_queue created:', logQueue.queue);
-    console.log('✓ inventory_queue created:', inventoryQueue.queue);
+    console.log('log_queue created:', logQueue.queue);
+    console.log('inventory_queue created:', inventoryQueue.queue);
     console.log('Connected to RabbitMQ');
     
-    // Start consuming inventory queue
     startInventoryConsumer();
+    startInventoryRPCListener();
   } catch (error) {
     console.error('Failed to connect to RabbitMQ:', error);
     setTimeout(connectRabbitMQ, 5000);
@@ -75,11 +74,9 @@ async function startInventoryConsumer() {
         try {
           const heroId = request.heroId;
           const action = request.action;
-          // const { action, heroId } = request;
           
           switch (action) {
             case 'get':
-              // GET inventory
               const inventoryResult = await dbClient.query(
                 'SELECT gold, equipped_count FROM inventory_schema.Inventories WHERE hero_id = $1',
                 [heroId]
@@ -94,7 +91,6 @@ async function startInventoryConsumer() {
               }
               break;
             case 'add_gold':
-              // Add gold
               await dbClient.query(
                 'UPDATE inventory_schema.Inventories SET gold = gold + $1 WHERE hero_id = $2',
                 [request.gold || 0, heroId]
@@ -103,7 +99,6 @@ async function startInventoryConsumer() {
               console.log(`Added ${request.gold || 0} gold to hero ${heroId}`);
               break;
             case 'remove_gold':
-              // Remove gold (floor at 0)
               await dbClient.query(
                 'UPDATE inventory_schema.Inventories SET gold = GREATEST(gold - $1, 0) WHERE hero_id = $2',
                 [request.gold || 0, heroId]
@@ -142,12 +137,9 @@ async function startInventoryConsumer() {
             }
               
             case 'update_inventory':
-              // Combined inventory update - handle gold and items in one operation
-              // goldDelta can be positive (add) or negative (remove)
               const goldDelta = request.gold || 0;
               const itemsToAdd = request.items || [];
               
-              // Update gold if there's a change
               if (goldDelta !== 0) {
                 if (goldDelta > 0) {
                   await dbClient.query(
@@ -166,7 +158,6 @@ async function startInventoryConsumer() {
                 }
               }
               
-              // Add artifacts
               for (const item of itemsToAdd) {
                 await dbClient.query(
                   'INSERT INTO inventory_schema.InventoryItems (hero_id, artifact_id, equipped, upgrade_level) VALUES ($1, $2, false, $3)',
@@ -195,8 +186,67 @@ async function startInventoryConsumer() {
   }
 }
 
+async function startInventoryRPCListener() {
+  if (!rabbitChannel) {
+    console.error('Cannot start inventory RPC listener: rabbitChannel is null');
+    return;
+  }
+  
+  try {
+    await rabbitChannel.assertQueue('inventory_rpc_queue', { durable: true });
+    
+    rabbitChannel.consume('inventory_rpc_queue', async (msg) => {
+      if (msg !== null) {
+        try {
+          const request = JSON.parse(msg.content.toString());
+          const { type, heroId } = request;
+          const correlationId = msg.properties.correlationId;
+          const replyTo = msg.properties.replyTo;
+          
+          let response;
+          
+          if (type === 'get_equipped_artifacts') {
+            const result = await dbClient.query(
+              `SELECT ii.id, ii.artifact_id AS "artifactId", ii.upgrade_level AS "upgradeLevel", a.hp_buff, a.att_buff, a.def_buff, a.regen_buff
+               FROM inventory_schema.InventoryItems ii
+               JOIN inventory_schema.Artifacts a ON ii.artifact_id = a.id
+               WHERE ii.hero_id = $1 AND ii.equipped = true`,
+              [heroId]
+            );
+            
+            response = {
+              success: true,
+              items: result.rows
+            };
+          } else {
+            response = { success: false, error: 'Unknown RPC type' };
+          }
+          
+          if (replyTo) {
+            rabbitChannel.sendToQueue(replyTo, Buffer.from(JSON.stringify(response)), {
+              correlationId: correlationId
+            });
+          }
+          
+          rabbitChannel.ack(msg);
+        } catch (error) {
+          console.error('Error processing inventory RPC request:', error);
+          rabbitChannel.ack(msg);
+        }
+      }
+    });
+    
+    console.log('Inventory RPC listener started');
+  } catch (error) {
+    console.error('Error starting inventory RPC listener:', error);
+  }
+}
+
 async function sendLog(userId, level, eventType, payload) {
-  if (!rabbitChannel) return;
+  if (!rabbitChannel) {
+    console.warn('[SENDLOG] Channel not initialized, skipping log');
+    return;
+  }
 
   try {
     const logData = {
@@ -208,9 +258,11 @@ async function sendLog(userId, level, eventType, payload) {
       payload: payload
     };
 
+    await rabbitChannel.assertQueue('log_queue', { durable: true });
     rabbitChannel.sendToQueue('log_queue', Buffer.from(JSON.stringify(logData)), { persistent: true });
+    console.log(`[SENDLOG] Log sent: ${eventType}`);
   } catch (error) {
-    console.error('Failed to send log:', error);
+    console.error('[SENDLOG] Error:', error);
   }
 }
 
@@ -248,7 +300,6 @@ app.post('/api/inventory', async (req, res) => {
     const result = await dbClient.query(insertInventory, [heroId, Number.isInteger(gold) ? gold : 0, 0]);
 
     if (result.rowCount === 0) {
-      // If conflict occurred, fetch the existing inventory
       const existingResult = await dbClient.query(
         'SELECT hero_id, gold, equipped_count FROM inventory_schema.Inventories WHERE hero_id = $1',
         [heroId]
@@ -285,7 +336,20 @@ app.get('/api/inventory/:heroId', async (req, res) => {
     }
 
     const itemsResult = await dbClient.query(
-      'SELECT id, artifact_id AS "artifactId", equipped, upgrade_level AS "upgradeLevel" FROM inventory_schema.InventoryItems WHERE hero_id = $1',
+      `SELECT 
+        ii.id, 
+        ii.artifact_id AS "artifactId", 
+        ii.equipped, 
+        ii.upgrade_level AS "upgradeLevel",
+        a.level AS "baseLevel",
+        a.name,
+        COALESCE(a.hp_buff, 0) * (ii.upgrade_level + 1) AS "hp_buff",
+        COALESCE(a.att_buff, 0) * (ii.upgrade_level + 1) AS "att_buff",
+        COALESCE(a.def_buff, 0) * (ii.upgrade_level + 1) AS "def_buff",
+        COALESCE(a.regen_buff, 0) * (ii.upgrade_level + 1) AS "regen_buff"
+       FROM inventory_schema.InventoryItems ii
+       LEFT JOIN inventory_schema.Artifacts a ON ii.artifact_id = a.id
+       WHERE ii.hero_id = $1`,
       [heroId]
     );
 
@@ -297,6 +361,77 @@ app.get('/api/inventory/:heroId', async (req, res) => {
   } catch (error) {
     console.error('Error fetching inventory:', error);
     return res.status(500).json({ error: 'Failed to fetch inventory' });
+  }
+});
+
+app.patch('/api/inventory/:itemId/equip', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { equipped } = req.body;
+
+    const itemResult = await dbClient.query(
+      'SELECT id, hero_id AS "heroId", equipped FROM inventory_schema.InventoryItems WHERE id = $1',
+      [itemId]
+    );
+
+    if (itemResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    const heroId = itemResult.rows[0].heroId;
+    const nextEquipped = typeof equipped === 'boolean' ? equipped : !itemResult.rows[0].equipped;
+
+    await dbClient.query('BEGIN');
+
+    await dbClient.query(
+      'UPDATE inventory_schema.InventoryItems SET equipped = $1 WHERE id = $2',
+      [nextEquipped, itemId]
+    );
+
+    const equippedCountResult = await dbClient.query(
+      'SELECT COUNT(*)::int AS count FROM inventory_schema.InventoryItems WHERE hero_id = $1 AND equipped = true',
+      [heroId]
+    );
+
+    await dbClient.query(
+      'UPDATE inventory_schema.Inventories SET equipped_count = $1 WHERE hero_id = $2',
+      [equippedCountResult.rows[0].count, heroId]
+    );
+
+    const updatedItemResult = await dbClient.query(
+      `SELECT 
+        ii.id, 
+        ii.artifact_id AS "artifactId", 
+        ii.equipped, 
+        ii.upgrade_level AS "upgradeLevel",
+        a.level AS "baseLevel",
+        a.name,
+        COALESCE(a.hp_buff, 0) * (ii.upgrade_level + 1) AS "hp_buff",
+        COALESCE(a.att_buff, 0) * (ii.upgrade_level + 1) AS "att_buff",
+        COALESCE(a.def_buff, 0) * (ii.upgrade_level + 1) AS "def_buff",
+        COALESCE(a.regen_buff, 0) * (ii.upgrade_level + 1) AS "regen_buff"
+       FROM inventory_schema.InventoryItems ii
+       LEFT JOIN inventory_schema.Artifacts a ON ii.artifact_id = a.id
+       WHERE ii.id = $1`,
+      [itemId]
+    );
+
+    await dbClient.query('COMMIT');
+
+    const artifactName = updatedItemResult.rows[0].name || `Artifact ${itemId.substring(0, 8)}`;
+    const eventType = nextEquipped ? 'artifact_equipped' : 'artifact_unequipped';
+    await sendLog(heroId, 1, eventType, { 
+      hero_id: heroId, 
+      item_id: itemId,
+      artifact_name: artifactName,
+      equipped: nextEquipped
+    });
+
+    return res.status(200).json(updatedItemResult.rows[0]);
+  } catch (error) {
+    await dbClient.query('ROLLBACK');
+    console.error('Error updating item equip state:', error);
+    return res.status(500).json({ error: 'Failed to update item equip state' });
   }
 });
 
@@ -381,7 +516,6 @@ app.delete('/api/inventory/:heroId', async (req, res) => {
   }
 });
 
-// GET /api/inventory/:heroId/equipped_artifacts - Get equipped artifacts 
 app.get('/api/inventory/:heroId/equipped_artifacts', async (req, res) => {
   try {
     const { heroId } = req.params;
@@ -396,7 +530,20 @@ app.get('/api/inventory/:heroId/equipped_artifacts', async (req, res) => {
     }
 
     const itemsResult = await dbClient.query(
-      'SELECT id, artifact_id AS "artifactId", equipped, upgrade_level AS "upgradeLevel" FROM inventory_schema.InventoryItems WHERE hero_id = $1 AND equipped = true',
+      `SELECT 
+        ii.id,
+        ii.artifact_id AS "artifactId",
+        ii.equipped,
+        ii.upgrade_level AS "upgradeLevel",
+        a.level AS "baseLevel",
+        a.name,
+        COALESCE(a.hp_buff, 0) * (ii.upgrade_level + 1) AS "hp_buff",
+        COALESCE(a.att_buff, 0) * (ii.upgrade_level + 1) AS "att_buff",
+        COALESCE(a.def_buff, 0) * (ii.upgrade_level + 1) AS "def_buff",
+        COALESCE(a.regen_buff, 0) * (ii.upgrade_level + 1) AS "regen_buff"
+       FROM inventory_schema.InventoryItems ii
+       LEFT JOIN inventory_schema.Artifacts a ON ii.artifact_id = a.id
+       WHERE ii.hero_id = $1 AND ii.equipped = true`,
       [heroId]
     );
 
@@ -410,24 +557,23 @@ app.get('/api/inventory/:heroId/equipped_artifacts', async (req, res) => {
   }
 });
 
-// GET /api/inventory/:heroId/upgrade-info/:artifactId - Get upgrade cost info
 app.get('/api/inventory/:heroId/upgrade-info/:artifactId', async (req, res) => {
   try {
     const { heroId, artifactId } = req.params;
+    console.log(`[UPGRADE-INFO] Route called with heroId=${heroId}, artifactId=${artifactId}`);
 
-    // Get current inventory gold
     const inventoryResult = await dbClient.query(
       'SELECT gold FROM inventory_schema.Inventories WHERE hero_id = $1',
       [heroId]
     );
+    console.log(`[UPGRADE-INFO] Inventory query result:`, inventoryResult.rows);
 
     if (inventoryResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Inventory not found' });
+      console.error(`[UPGRADE-INFO] Inventory not found for heroId=${heroId}, artifactId=${artifactId}`);
+      return res.status(404).json({ error: 'Inventory not found', heroId, artifactId });
     }
-
     const currentGold = inventoryResult.rows[0].gold;
 
-    // Get artifact info and current upgrade level
     const itemResult = await dbClient.query(
       `SELECT ii.upgrade_level, a.level as base_level, a.name
        FROM inventory_schema.InventoryItems ii
@@ -435,17 +581,18 @@ app.get('/api/inventory/:heroId/upgrade-info/:artifactId', async (req, res) => {
        WHERE ii.hero_id = $1 AND ii.artifact_id = $2`,
       [heroId, artifactId]
     );
+    console.log(`[UPGRADE-INFO] Item query result:`, itemResult.rows);
 
     if (itemResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Artifact not found in inventory' });
+      console.error(`[UPGRADE-INFO] Artifact not found for heroId=${heroId}, artifactId=${artifactId}`);
+      return res.status(404).json({ error: 'Artifact not found in inventory', heroId, artifactId });
     }
 
     const { upgrade_level, base_level, name } = itemResult.rows[0];
     const nextLevel = upgrade_level + 1;
     const maxLevel = 10;
 
-    // Calculate upgrade cost: base_level * 100 * (1 + upgrade_level)
-    const nextUpgradeCost = base_level * 100 * (1 + upgrade_level);
+    const nextUpgradeCost = 25 * (upgrade_level + 1);
     const canUpgrade = upgrade_level < maxLevel && currentGold >= nextUpgradeCost;
 
     return res.status(200).json({
@@ -467,12 +614,10 @@ app.get('/api/inventory/:heroId/upgrade-info/:artifactId', async (req, res) => {
   }
 });
 
-// POST /api/inventory/:heroId/upgrade/:artifactId - Upgrade an artifact with gold
 app.post('/api/inventory/:heroId/upgrade/:artifactId', async (req, res) => {
   try {
     const { heroId, artifactId } = req.params;
 
-    // Get current inventory and artifact
     const inventoryResult = await dbClient.query(
       'SELECT gold FROM inventory_schema.Inventories WHERE hero_id = $1',
       [heroId]
@@ -484,7 +629,6 @@ app.post('/api/inventory/:heroId/upgrade/:artifactId', async (req, res) => {
 
     const currentGold = inventoryResult.rows[0].gold;
 
-    // Get artifact info and current upgrade level
     const itemResult = await dbClient.query(
       `SELECT ii.upgrade_level, a.level as base_level, a.name
        FROM inventory_schema.InventoryItems ii
@@ -500,8 +644,7 @@ app.post('/api/inventory/:heroId/upgrade/:artifactId', async (req, res) => {
     const { upgrade_level, base_level, name } = itemResult.rows[0];
     const nextLevel = upgrade_level + 1;
 
-    // Calculate upgrade cost: base_level * 100 * (1 + upgrade_level)
-    const upgradeCost = base_level * 100 * (1 + upgrade_level);
+    const upgradeCost = 25 * (upgrade_level + 1);
 
     if (currentGold < upgradeCost) {
       return res.status(400).json({ 
@@ -511,21 +654,17 @@ app.post('/api/inventory/:heroId/upgrade/:artifactId', async (req, res) => {
       });
     }
 
-    // Maximum 10 upgrade levels
     if (upgrade_level >= 10) {
       return res.status(400).json({ error: 'Artifact is already at maximum upgrade level' });
     }
 
-    // Perform upgrade
     await dbClient.query('BEGIN');
 
-    // Deduct gold
     await dbClient.query(
       'UPDATE inventory_schema.Inventories SET gold = gold - $1 WHERE hero_id = $2',
       [upgradeCost, heroId]
     );
 
-    // Increase upgrade level
     await dbClient.query(
       'UPDATE inventory_schema.InventoryItems SET upgrade_level = upgrade_level + 1 WHERE hero_id = $1 AND artifact_id = $2',
       [heroId, artifactId]

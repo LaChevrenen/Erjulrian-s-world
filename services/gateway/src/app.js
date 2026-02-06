@@ -10,7 +10,7 @@ import dungeonRouter from './routes/dungeon.routes.js';
 const app = express();
 
 app.use(cors({
-  origin: 'http://localhost:8080',
+  origin: ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:5174'],
   credentials: true
 }));
 app.use(express.json());

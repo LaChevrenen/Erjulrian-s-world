@@ -3,9 +3,19 @@
   "version": "1.0.0",
   "description": "Test scenario for Erjulrian's World",
   "main": "test-scenario.js",
+  "scripts": {
+    "dev": "cd services && docker-compose -f compose.yaml up",
+    "stop": "cd services && docker-compose -f compose.yaml down",
+    "dev:local-front": "concurrently \"cd services && docker-compose -f compose.yaml up\" \"cd front && npm run dev\"",
+    "dev:backend": "cd services && docker-compose -f compose.yaml up",
+    "dev:frontend": "cd front && npm run dev"
+  },
   "dependencies": {
     "amqplib": "^0.10.9",
     "axios": "^1.6.0",
     "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }

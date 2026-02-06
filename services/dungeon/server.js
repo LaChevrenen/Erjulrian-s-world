@@ -192,6 +192,7 @@ async function getMonsterWithLoot(monsterId) {
 
 // RabbitMQ publisher setup
 let channel;
+let rpcReplyQueues = {};
 
 async function setupRabbitMQ() {
     try {
@@ -207,6 +208,61 @@ async function setupRabbitMQ() {
     }
 }
 
+// Retry helper with exponential backoff
+async function retryWithBackoff(fn, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            const isLastAttempt = attempt === maxAttempts;
+            const delayMs = Math.min(100 * Math.pow(2, attempt - 1), 2000);
+            
+            console.error(`[RETRY] Attempt ${attempt}/${maxAttempts} failed:`, error.message);
+            
+            if (isLastAttempt) {
+                console.error(`[RETRY] All ${maxAttempts} attempts failed. Giving up.`);
+                throw error;
+            }
+            
+            console.log(`[RETRY] Waiting ${delayMs}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+    }
+}
+
+// RPC Call for inter-service communication via RabbitMQ
+async function rpcCall(queue, message, timeoutMs = 5000) {
+    if (!channel) throw new Error('RabbitMQ channel not initialized');
+    
+    const correlationId = Math.random().toString(36).substring(7);
+    const replyQueue = `dungeon.rpc.reply.${correlationId}`;
+    
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            reject(new Error(`RPC timeout for queue ${queue}`));
+        }, timeoutMs);
+        
+        channel.assertQueue(replyQueue, { exclusive: true, autoDelete: true }).then(() => {
+            channel.consume(replyQueue, (msg) => {
+                if (msg && msg.properties.correlationId === correlationId) {
+                    clearTimeout(timeout);
+                    const response = JSON.parse(msg.content.toString());
+                    channel.ack(msg);
+                    resolve(response);
+                }
+            });
+            
+            channel.assertQueue(queue, { durable: true }).then(() => {
+                channel.sendToQueue(queue, Buffer.from(JSON.stringify(message)), {
+                    persistent: true,
+                    correlationId: correlationId,
+                    replyTo: replyQueue
+                });
+            });
+        }).catch(reject);
+    });
+}
+
 // Helper function to publish events
 async function publishEvent(queue, message) {
     if (channel) {
@@ -216,6 +272,37 @@ async function publishEvent(queue, message) {
         } catch (error) {
             console.error(`Failed to publish event to ${queue}:`, error);
         }
+    }
+}
+
+// Helper function to send logs
+function sendLog(heroId, eventType, payload = {}) {
+    if (!channel) {
+        console.warn('[SENDLOG] Channel not initialized, skipping log');
+        return;
+    }
+
+    try {
+        console.log(`[SENDLOG] Attempting to send log: ${eventType}`);
+        const logData = {
+            user_id: heroId,
+            level: 1,
+            timestamp: new Date().toISOString(),
+            service: 'dungeon',
+            eventType: eventType,
+            payload: payload
+        };
+
+        // Ensure queue exists before sending
+        channel.assertQueue('log_queue', { durable: true }).then(() => {
+            console.log(`[SENDLOG] Queue asserted, sending message...`);
+            channel.sendToQueue('log_queue', Buffer.from(JSON.stringify(logData)), { persistent: true });
+            console.log(`[SENDLOG] Log sent: ${eventType}`);
+        }).catch(error => {
+            console.error('[SENDLOG] Failed to send log:', error.message);
+        });
+    } catch (error) {
+        console.error('[SENDLOG] Error:', error.message);
     }
 }
 
@@ -236,6 +323,8 @@ async function startCombatResultConsumer() {
                 try {
                     const battleResult = JSON.parse(msg.content.toString());
                     console.log('Combat result received:', battleResult);
+                    console.log('Message keys:', Object.keys(battleResult));
+                    console.log('currentHp value:', battleResult.currentHp, 'type:', typeof battleResult.currentHp);
 
                     const runId = battleResult.runId;
                     const heroId = battleResult.heroId || battleResult.hero?.heroId;
@@ -258,6 +347,81 @@ async function startCombatResultConsumer() {
                     
                     // Invalidate cache
                     await clearCachedDungeon(runId);
+
+                    const heroCurrentHp = typeof battleResult.currentHp === 'number'
+                        ? battleResult.currentHp
+                        : battleResult.hero?.stats?.current_hp;
+
+                    console.log(`Hero HP check: ${heroCurrentHp} (type: ${typeof heroCurrentHp}), Is dead? ${heroCurrentHp <= 0}`);
+
+                    const combatResult = battleResult.result;
+                    const isHeroDead = (heroCurrentHp !== undefined && heroCurrentHp <= 0) || combatResult === 'lose';
+
+                    if (isHeroDead) {
+                        console.log(`Combat indicates hero death (result: ${combatResult}). Proceeding to cleanup...`);
+                        
+                        try {
+                            console.log(`[UPDATE-HP] Updating hero ${heroId} HP to 0 via RabbitMQ...`);
+                            try {
+                                await rpcCall('hero_rpc_queue', {
+                                    type: 'update_hp',
+                                    heroId,
+                                    current_hp: 0
+                                });
+                                console.log(`[UPDATE-HP] Hero HP updated to 0`);
+                            } catch (hpUpdateError) {
+                                console.error(`[UPDATE-HP] Failed to update hero HP:`, hpUpdateError.message);
+                            }
+
+                            console.log(`HERO DIED: Deleting dungeon run ${runId} for hero ${heroId}`);
+                            
+                            // Get dungeon data before deletion for logging
+                            const dungeonForLogging = await DungeonRun.findById(runId);
+                            const deleteResult = await DungeonRun.deleteOne({ _id: runId });
+                            console.log(`Deletion result:`, deleteResult);
+                            
+                            // Send log for dungeon deletion on hero death
+                            console.log(`[DEBUG] About to call sendLog for dungeon_deleted...`);
+                            sendLog(heroId, 'dungeon_deleted', {
+                                runId: runId,
+                                reason: 'hero_died',
+                                floor: dungeonForLogging?.currentFloor || 0,
+                                room: dungeonForLogging?.currentRoom || 0
+                            });
+                            console.log(`[DEBUG] sendLog call completed`);
+                            
+                            // Delete hero
+                            await publishEvent('hero_queue', {
+                                type: 'delete_hero',
+                                heroId,
+                                reason: 'died',
+                                timestamp: new Date()
+                            });
+                            console.log(`Published hero deletion event for hero ${heroId}`);
+                            
+                            await publishEvent('dungeon_queue', {
+                                type: 'dungeon_failed',
+                                runId,
+                                heroId,
+                                reason: 'hero_dead',
+                                timestamp: new Date()
+                            });
+                        } catch (error) {
+                            console.error('[DEATH-CLEANUP] Failed to cleanup after death:', error.message);
+                        }
+                    } else {
+                        console.log(`[UPDATE-HP] Updating hero ${heroId} HP to ${heroCurrentHp} via RabbitMQ...`);
+                        try {
+                            await rpcCall('hero_rpc_queue', {
+                                type: 'update_hp',
+                                heroId,
+                                current_hp: Math.max(0, heroCurrentHp)
+                            });
+                            console.log(`[UPDATE-HP] Hero HP updated to ${heroCurrentHp}`);
+                        } catch (hpUpdateError) {
+                            console.error(`[UPDATE-HP] Failed to update hero HP:`, hpUpdateError.message);
+                        }
+                    }
 
                     channel.ack(msg);
                 } catch (error) {
@@ -358,8 +522,10 @@ function getChoices(currentFloor, currentRoom, allRooms) {
 }
 
 function buildDungeonResponse(dungeon) {
+    const id = dungeon._id ? String(dungeon._id) : dungeon.runId;
+    console.log(`buildDungeonResponse - dungeon._id: ${dungeon._id}, String(._id): ${id}, length: ${id?.length}`);
     return {
-        runId: dungeon._id?.toString?.() || dungeon.runId?.toString?.() || dungeon._id || dungeon.runId,
+        runId: id,
         heroId: dungeon.heroId,
         status: dungeon.status,
         position: dungeon.position,
@@ -413,6 +579,13 @@ app.post('/api/dungeons/start', async (req, res) => {
             timestamp: new Date()
         });
 
+        // Send log to RabbitMQ
+        sendLog(heroId, 'dungeon_started', {
+            runId: savedDungeon._id || dungeon._id,
+            floor: 0,
+            totalRooms: dungeonRooms.length
+        });
+
         const payload = buildDungeonResponse(savedDungeon || dungeon);
         await setCachedDungeon(payload.runId, payload);
 
@@ -454,10 +627,23 @@ app.delete('/api/dungeons/:runId', async (req, res) => {
     try {
         const { runId } = req.params;
 
+        // Get dungeon data before deletion to get heroId for logging
+        const dungeonBeforeDelete = await DungeonRun.findById(runId);
+        
         const dungeon = await DungeonRun.deleteOne({_id: runId});
 
         if (!dungeon) {
             return res.status(404).json({ error: 'Dungeon run not found' });
+        }
+
+        // Send log for dungeon deletion
+        if (dungeonBeforeDelete) {
+            sendLog(dungeonBeforeDelete.heroId, 'dungeon_deleted', {
+                runId: runId,
+                status: dungeonBeforeDelete.status,
+                floor: dungeonBeforeDelete.currentFloor,
+                room: dungeonBeforeDelete.currentRoom
+            });
         }
 
         res.json({deleted: runId});
@@ -490,22 +676,51 @@ app.get('/api/dungeons/:runId/choices', async (req, res) => {
         const dungeon = cachedDungeon || await DungeonRun.findById(runId);
 
         if (!dungeon) {
+            sendLog(null, 'dungeon_choices_request', { runId, status: 'not_found' });
             return res.status(404).json({ error: 'Dungeon run not found' });
         }
 
         if (dungeon.status !== 'in_progress') {
+            sendLog(dungeon.heroId, 'dungeon_choices_request', { runId, status: dungeon.status });
             return res.status(400).json({ error: 'Dungeon run is not in progress' });
         }
+        
+        sendLog(dungeon.heroId, 'dungeon_choices_request', { 
+            runId, 
+            floor: dungeon.position.floor, 
+            room: dungeon.position.room 
+        });
 
         const choices = getChoices(dungeon.position.floor, dungeon.position.room, dungeon.rooms);
 
-        res.json({
-            choices: choices.map(c => ({
+        const choicesWithMonsters = await Promise.all(choices.map(async (c) => {
+            let monster = null;
+            if (c.monsterId) {
+                const monsterData = await getMonsterWithLoot(c.monsterId);
+                if (monsterData) {
+                    monster = {
+                        id: monsterData.id,
+                        name: monsterData.name,
+                        type: monsterData.type,
+                        description: monsterData.description,
+                        stats: monsterData.stats,
+                        lootTable: monsterData.lootTable
+                    };
+                }
+            }
+
+            return {
                 floor: c.floor,
                 room: c.room,
+                choiceNumber: c.choiceNumber,
                 type: c.type,
-                monsterId: c.monsterId || null
-            }))
+                monsterId: c.monsterId || null,
+                monster
+            };
+        }));
+
+        res.json({
+            choices: choicesWithMonsters
         });
     } catch (error) {
         console.error('Error fetching choices:', error);
@@ -559,6 +774,15 @@ app.post('/api/dungeons/:runId/choose', async (req, res) => {
         const payload = buildDungeonResponse(dungeon);
         await setCachedDungeon(payload.runId, payload);
 
+        // Send log
+        sendLog(dungeon.heroId, 'room_entered', {
+            runId: dungeon._id,
+            floor: dungeon.position.floor,
+            room: dungeon.position.room,
+            roomType: chosenRoom.type,
+            monsterId: chosenRoom.monsterId || null
+        });
+
         // Publish event
         await publishEvent('dungeon_queue', {
             type: 'room_entered',
@@ -577,7 +801,8 @@ app.post('/api/dungeons/:runId/choose', async (req, res) => {
                 if (!monster) {
                     return res.json({
                         position: dungeon.position,
-                        roomType: chosenRoom.type
+                        roomType: chosenRoom.type,
+                        runId: dungeon._id
                     });
                 }
 
@@ -592,14 +817,43 @@ app.post('/api/dungeons/:runId/choose', async (req, res) => {
                     runId: dungeon._id,
                     room: { floor: chosenRoom.floor, room: chosenRoom.room, type: chosenRoom.type }
                 });
+
+                // Send log to RabbitMQ
+                sendLog(dungeon.heroId, 'combat_initiated', {
+                    runId: dungeon._id,
+                    floor: chosenRoom.floor,
+                    room: chosenRoom.room,
+                    monsterName: monster.name,
+                    monsterId: monster._id
+                });
             } catch (error) {
                 console.error('Failed to trigger combat:', error);
             }
         }
 
-        res.json({
+        // If rest room, restore hero HP to full (données front)
+        let restResponse = {};
+        if (chosenRoom.type === 'rest') {
+            // On fait confiance au front pour le calcul de la vie max
+            restResponse = {
+                heroRestored: true,
+                previousHp: heroStats.current_hp,
+                restoredHp: heroStats.hp
+            };
+            sendLog(dungeon.heroId, 'hero_rested', {
+                runId: dungeon._id,
+                floor: dungeon.position.floor,
+                room: dungeon.position.room,
+                previousHp: heroStats.current_hp,
+                restoredHp: heroStats.hp
+            });
+        }
+
+        return res.json({
             position: dungeon.position,
-            roomType: chosenRoom.type
+            roomType: chosenRoom.type,
+            runId: dungeon._id,
+            ...restResponse
         });
     } catch (error) {
         console.error('Error choosing room:', error);
@@ -635,6 +889,14 @@ app.post('/api/dungeons/:runId/finish', async (req, res) => {
             heroId: dungeon.heroId,
             finishedAt: dungeon.finishedAt,
             timestamp: new Date()
+        });
+
+        // Send log to RabbitMQ
+        sendLog(dungeon.heroId, 'dungeon_completed', {
+            runId: dungeon._id,
+            floor: dungeon.position.floor,
+            room: dungeon.position.room,
+            finishedAt: dungeon.finishedAt
         });
 
         res.json({

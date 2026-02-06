@@ -1,5 +1,3 @@
--- Dialect: postgres
--- Insert monsters directly into game_schema
 INSERT INTO game_schema.Monsters (id, name, type, description, hp, att, def, regen) VALUES
 ('550e8400-e29b-41d4-a716-446655440101', 'Gobelin du Dimanche', 'goblin', 'Un petit gobelin vert qui essaie de faire peur le dimanche. Armé d''une vieille fourchette rouillée qu''il a trouvée.', 10, 2, 1, 0),
 ('550e8400-e29b-41d4-a716-446655440102', 'Gobelin Campion', 'goblin', 'Le champion du camping des gobelins. Il a des cicatrices de s''être assis trop près du feu de camp.', 20, 4, 2, 1),

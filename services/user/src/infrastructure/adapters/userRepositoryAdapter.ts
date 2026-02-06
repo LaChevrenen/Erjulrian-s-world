@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
-    port: (process.env.DB_PORT || 5432) as number,
+    port: (process.env.DB_PORT || 5435) as number,
     user: process.env.DB_USER || 'user_user',
     password: process.env.DB_PASSWORD || 'user_password',
     database: process.env.DB_NAME || 'erjulrian_db'
@@ -24,15 +24,14 @@ export class UserRepositoryAdapter implements UserRepositoryPort {
     private async connect(retries = 5) {
         for (let i = 0; i < retries; i++) {
             try {
-                // Recréer le client à chaque tentative
                 if (i > 0) {
                     this.dbClient = new Client(dbConfig);
                 }
                 await this.dbClient.connect();
-                console.log('✅ Connected to PostgreSQL database');
+                console.log('Connected to PostgreSQL database');
                 return;
             } catch(error) {
-                console.error(`❌ DB connection attempt ${i + 1}/${retries} failed:`, error.message);
+                console.error(`DB connection attempt ${i + 1}/${retries} failed:`, (error as Error).message);
                 if (i < retries - 1) {
                     await new Promise(resolve => setTimeout(resolve, 5000));
                 }

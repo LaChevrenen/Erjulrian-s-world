@@ -11,54 +11,58 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3009;
 
-// Elasticsearch client configuration
 const ELASTICSEARCH_URL = process.env.ELASTICSEARCH_URL || 'http://localhost:9200';
 const INDEX_NAME = 'logs';
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
 
-// Load Swagger documentation
 const swaggerDocument = YAML.load('./swagger.yaml');
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
-// Elasticsearch client
 let esClient;
 
 async function connectElasticsearch() {
     try {
-        esClient = new Client({ node: ELASTICSEARCH_URL });
+        esClient = new Client({ node: ELASTICSEARCH_URL, requestTimeout: 30000 });
         
-        // Test connection
-        await esClient.ping();
-        console.log('Connected to Elasticsearch');
+        const info = await esClient.info();
+        console.log('Connected to Elasticsearch:', info.version.number);
         
-        // Create index if it doesn't exist
-        const indexExists = await esClient.indices.exists({ index: INDEX_NAME });
-        if (!indexExists) {
-            await esClient.indices.create({
-                index: INDEX_NAME,
-                body: {
-                    mappings: {
-                        properties: {
-                            user_id: { type: 'keyword' },
-                            level: { type: 'integer' },
-                            timestamp: { type: 'date' },
-                            service: { type: 'keyword' },
-                            event_type: { type: 'keyword' },
-                            payload: { type: 'object', enabled: true }
+        try {
+            await esClient.indices.get({ index: INDEX_NAME });
+            console.log(`Index ${INDEX_NAME} already exists`);
+        } catch (getError) {
+            if (getError.statusCode === 404) {
+                try {
+                    await esClient.indices.create({
+                        index: INDEX_NAME,
+                        body: {
+                            mappings: {
+                                properties: {
+                                    user_id: { type: 'keyword' },
+                                    level: { type: 'keyword' },
+                                    timestamp: { type: 'date' },
+                                    service: { type: 'keyword' },
+                                    event_type: { type: 'keyword' },
+                                    payload: { type: 'object', enabled: true }
+                                }
+                            }
                         }
-                    }
+                    });
+                    console.log(`Index ${INDEX_NAME} created successfully`);
+                } catch (createError) {
+                    console.error(`Failed to create index ${INDEX_NAME}:`, createError.message);
                 }
-            });
-            console.log(`Index ${INDEX_NAME} created`);
+            } else {
+                throw getError;
+            }
         }
     } catch (error) {
-        console.error('Failed to connect to Elasticsearch:', error);
-        setTimeout(connectElasticsearch, 5000); // Retry after 5 seconds
+        console.error('Failed to connect to Elasticsearch:', error.message);
+        setTimeout(connectElasticsearch, 5000);
     }
 }
 
-// RabbitMQ consumer
 async function startRabbitMQConsumer() {
     try {
         const connection = await amqp.connect(RABBITMQ_URL);
@@ -72,9 +76,7 @@ async function startRabbitMQConsumer() {
         channel.consume(queue, async (msg) => {
             if (msg !== null) {
                 const logData = JSON.parse(msg.content.toString());
-                console.log("Log received:", logData);
-
-                // Insert log into database
+                
                 await insertLog(logData);
 
                 channel.ack(msg);
@@ -82,16 +84,20 @@ async function startRabbitMQConsumer() {
         });
     } catch (error) {
         console.error('Failed to connect to RabbitMQ:', error);
-        setTimeout(startRabbitMQConsumer, 5000); // Retry after 5 seconds
+        setTimeout(startRabbitMQConsumer, 5000);
     }
 }
 
-// Insert log into Elasticsearch
 async function insertLog(logData) {
     try {
+        let levelStr = 'info';
+        if (logData.level === 2 || logData.level === 'warning') levelStr = 'warning';
+        if (logData.level === 3 || logData.level === 'error') levelStr = 'error';
+        if (logData.level === 1 || logData.level === 'info') levelStr = 'info';
+        
         const document = {
             user_id: logData.user_id || logData.userId || null,
-            level: logData.level || 0,
+            level: levelStr,
             timestamp: logData.timestamp || new Date().toISOString(),
             service: logData.service || 'unknown',
             event_type: logData.eventType || 'unknown',
@@ -103,22 +109,17 @@ async function insertLog(logData) {
             document: document
         });
         
-        console.log('Log inserted with ID:', result._id);
         return result._id;
     } catch (error) {
-        console.error('Error inserting log:', error);
+        console.error('[ELASTICSEARCH] Erreur sauvegarde log:', error.message);
         throw error;
     }
 }
 
-// REST API Endpoints
-
-// GET /api/logs - List logs with optional filters
 app.get('/api/logs', async (req, res) => {
     try {
         const { level, service, eventType, from, to, limit } = req.query;
         
-        // Build Elasticsearch query
         const must = [];
         
         if (level !== undefined) {
@@ -162,7 +163,6 @@ app.get('/api/logs', async (req, res) => {
     }
 });
 
-// POST /api/logs - Create a new log entry
 app.post('/api/logs', async (req, res) => {
     try {
         const logData = req.body;
@@ -174,13 +174,10 @@ app.post('/api/logs', async (req, res) => {
     }
 });
 
-// GET /api/logs/:logId - Get a specific log by ID
 app.get('/api/logs/:logId', async (req, res) => {
-    //A implémenter quand nécessaire
     res.status(501).json({ error: 'Not implemented' });
 });
 
-// DELETE /api/logs/:logId - Delete a log entry
 app.delete('/api/logs/:logId', async (req, res) => {
     try {
         const { logId } = req.params;
@@ -199,12 +196,10 @@ app.delete('/api/logs/:logId', async (req, res) => {
     }
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'log-service' });
 });
 
-// Start server
 async function start() {
     await connectElasticsearch();
     await startRabbitMQConsumer();

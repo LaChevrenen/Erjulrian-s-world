@@ -9,6 +9,7 @@ import {UserRepositoryAdapter} from "../infrastructure/adapters/userRepositoryAd
 import { UserService } from "../domain/services/UserService";
 import { UserController } from "../presentation/controllers/userController";
 import { errorHandler } from "./errorHandling";
+import { initLogger } from "./logger";
 
 const app = express();
 
@@ -34,3 +35,5 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`Server listening on http://0.0.0.0:${port}`);
   console.log(`Swagger docs at http://0.0.0.0:${port}/docs`);
 });
+
+initLogger();

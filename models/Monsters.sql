@@ -1,7 +1,7 @@
 Table Monsters {
   id uuid [pk]
   name varchar
-  type varchar        // goblin, orc, dragon, etc
+  type varchar
   description text
 
   hp int

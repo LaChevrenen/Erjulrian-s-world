@@ -1,5 +1,22 @@
 services:
 
+  frontend:
+    build: ../front
+    container_name: erjulrian-frontend
+    depends_on:
+      - gateway-service
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../front:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://gateway-service:3000
+    networks:
+      - erjulrian-network
+    restart: always
+
   gateway-service:
     build: ./gateway
     container_name: gateway-api
@@ -7,6 +24,9 @@ services:
       - rabbitmq
     ports:
       - "3000:3000"
+    volumes:
+      - ./gateway:/app
+      - /app/node_modules
     environment:
       - NODE_ENV=development
       - PORT=3000
@@ -157,7 +177,7 @@ services:
     networks:
       - erjulrian-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d erjulrian_inventory"]
       interval: 10s
       timeout: 5s
       retries: 5

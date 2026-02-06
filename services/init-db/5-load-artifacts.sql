@@ -1,5 +1,3 @@
--- Dialect: postgres
--- Insert artifacts directly into game_schema
 INSERT INTO game_schema.Artifacts (id, name, level, hp_buff, att_buff, def_buff, regen_buff, description) VALUES
 ('550e8400-e29b-41d4-a716-446655440501', 'Pique-nique du Gobelin', 1, 0, 2, 0, 0, 'Une fourchette rouillée retrouvée dans un fossé. Etrangement tranchante. Les gobelins adorent.'),
 ('550e8400-e29b-41d4-a716-446655440502', 'Veste de Grand-mère', 1, 5, 0, 2, 0, 'Une vieille veste tricotée à la main qui sent la lavande. Incroyablement confortable et protectrice.'),
@@ -46,7 +44,6 @@ INSERT INTO game_schema.Artifacts (id, name, level, hp_buff, att_buff, def_buff,
 ('550e8400-e29b-41d4-a716-446655440543', 'Boulette de Pâte à Modeler', 1, 8, 1, 1, 2, 'Une ancienne boulette de pâte à modeler devenue magique. Molle, réconfortante, et elle sentait bon la cerise avant que les pigeons ne la salissent.'),
 ('550e8400-e29b-41d4-a716-446655440544', 'Bâton de Craie Sacré', 2, 5, 4, 2, 1, 'Un bâton de craie qui refuse de se casser. Les pigeons le détestent viscéralement. Fait crisser horriblement quand on l''utilise contre le ciel.');
 
--- Insert monster loot relationships
 INSERT INTO game_schema.MonsterLoot (monster_id, artifact_id, chance, amount) VALUES
 ('550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440501', 0.6, 1),
 ('550e8400-e29b-41d4-a716-446655440101', '550e8400-e29b-41d4-a716-446655440534', 0.4, 1),

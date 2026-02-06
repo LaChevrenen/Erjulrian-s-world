@@ -1,6 +1,7 @@
 Table HeroStats {
   hero_id uuid [pk]
 
+  name varchar
   level int
   xp int
 

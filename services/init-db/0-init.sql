@@ -1,24 +1,10 @@
--- Create the user for each services
 CREATE USER inventory_user WITH PASSWORD 'inventory_password';
 CREATE USER hero_user WITH PASSWORD 'hero_password';
 CREATE USER user_user WITH PASSWORD 'user_password';
 CREATE USER dungeon_user WITH PASSWORD 'dungeon_password';
 
--- ###########################################
--- REVOKE DEFAULT ACCESS
--- ###########################################
-
--- Make sure every user accessing the DB has no default access to public schema
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
-
--- ###########################################
--- GAME DATA SCHEMA (ARTIFACTS & MONSTERS)
--- ###########################################
-
--- Creation of the schema for game data
 CREATE SCHEMA IF NOT EXISTS game_schema;
-
--- Artifacts table
 CREATE TABLE game_schema.Artifacts (
   id UUID PRIMARY KEY,
   name VARCHAR,
@@ -29,8 +15,6 @@ CREATE TABLE game_schema.Artifacts (
   regen_buff INT,
   description TEXT
 );
-
--- Monsters table
 CREATE TABLE game_schema.Monsters (
   id UUID PRIMARY KEY,
   name VARCHAR,
@@ -41,8 +25,6 @@ CREATE TABLE game_schema.Monsters (
   def INT,
   regen INT
 );
-
--- Monster loot table
 CREATE TABLE game_schema.MonsterLoot (
   monster_id UUID REFERENCES game_schema.Monsters(id) ON DELETE CASCADE,
   artifact_id UUID REFERENCES game_schema.Artifacts(id),
@@ -50,33 +32,17 @@ CREATE TABLE game_schema.MonsterLoot (
   amount INT,
   PRIMARY KEY (monster_id, artifact_id)
 );
-
--- ###########################################
--- GAME DATA PERMISSIONS (READ-ONLY for dungeon)
--- ###########################################
-
 GRANT USAGE ON SCHEMA game_schema TO inventory_user;
 GRANT USAGE ON SCHEMA game_schema TO hero_user;
 GRANT USAGE ON SCHEMA game_schema TO dungeon_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA game_schema TO inventory_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA game_schema TO hero_user;
 GRANT SELECT ON ALL TABLES IN SCHEMA game_schema TO dungeon_user;
-
--- ###########################################
--- HERO SERVICE SCHEMA (doit être créé AVANT inventory)
--- ###########################################
-
--- Creation of the schema for hero service
 CREATE SCHEMA IF NOT EXISTS hero_schema;
-
--- ###########################################
--- HERO SERVICE TABLES
--- ###########################################
-
--- Table HeroStats
 CREATE TABLE hero_schema.HeroStats (
   hero_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL,
+  name VARCHAR(255) NOT NULL,
   level INT DEFAULT 1,
   xp INT DEFAULT 0,
   base_hp INT DEFAULT 20,
@@ -88,26 +54,10 @@ CREATE TABLE hero_schema.HeroStats (
 );
 
 CREATE INDEX idx_hero_user_id ON hero_schema.HeroStats(user_id);
-
--- ###########################################
--- HERO SERVICE PERMISSIONS (RESTRICTIVE)
--- ###########################################
-
--- Set permissions for hero service user on hero schema
 GRANT USAGE ON SCHEMA hero_schema TO hero_user;
-
--- Set permissions on tables - SELECT, INSERT, UPDATE only (NO DELETE)
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA hero_schema TO hero_user;
-
--- Set visibility on sequences
 ALTER ROLE admin SET search_path TO hero_schema, public;
 ALTER ROLE hero_user SET search_path TO hero_schema, public;
-
--- ###########################################
--- INVENTORY SERVICE SCHEMA
--- ###########################################
-
--- Creation of the schema for inventory service
 CREATE SCHEMA IF NOT EXISTS inventory_schema;
 
 CREATE TABLE inventory_schema.Inventories (
@@ -125,31 +75,12 @@ CREATE TABLE inventory_schema.InventoryItems (
   UNIQUE (hero_id, artifact_id, upgrade_level)
 );
 
--- ###########################################
--- INVENTORY SERVICE PERMISSIONS (RESTRICTIVE)
--- ###########################################
-
--- Set permissions for inventory service user on inventory schema
 GRANT USAGE ON SCHEMA inventory_schema TO inventory_user;
-
--- Set permissions on tables - SELECT, INSERT, UPDATE only (NO DELETE)
 GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA inventory_schema TO inventory_user;
-
--- Set visibility on sequences
 ALTER ROLE admin SET search_path TO inventory_schema, public;
 ALTER ROLE inventory_user SET search_path TO inventory_schema, public;
 
--- ###########################################
-
--- ###########################################
--- USER SERVICE SCHEMA
--- ###########################################
-
 CREATE SCHEMA IF NOT EXISTS user_schema;
-
--- ###########################################
--- USER SERVICE TABLES
--- ###########################################
 
 CREATE TABLE user_schema.Users (
   id UUID PRIMARY KEY,
@@ -165,12 +96,3 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA user_schema TO user
 
 ALTER ROLE admin SET search_path TO user_schema, public;
 ALTER ROLE user_user SET search_path TO user_schema, public;
-
--- ###########################################
--- DUNGEON SERVICE PERMISSIONS (READ-ONLY on game_schema)
--- ###########################################
-
--- Dungeon service can ONLY read game_schema (monsters data)
--- Already granted above in GAME DATA PERMISSIONS section
-
--- ###########################################

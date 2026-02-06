@@ -4,19 +4,25 @@ import {auth} from '../middlewares/auth.middlewares.js';
 const INVENTORY_SERVICE_URL = 'http://inventory-api:3004';
 
 const inventoryRouter = Router();
-// Create inventory
+
 inventoryRouter.post('/', (req, res) => {
     forward(req, res, INVENTORY_SERVICE_URL);
 });
-// Get inventory for a Hero
+inventoryRouter.post('/:heroId/upgrade/:artifactId', auth, (req, res) => {
+    forward(req, res, INVENTORY_SERVICE_URL);
+});
+inventoryRouter.patch('/:itemId/equip', auth, (req, res) => {
+    forward(req, res, INVENTORY_SERVICE_URL);
+});
+inventoryRouter.get('/:heroId/upgrade-info/:artifactId', auth, (req, res) => {
+    forward(req, res, INVENTORY_SERVICE_URL);
+});
 inventoryRouter.get('/:heroId', auth, (req, res) => {
     forward(req, res, INVENTORY_SERVICE_URL);
 });
-// Modify the inventory of hero
 inventoryRouter.put('/:heroId', auth, (req, res) => {
     forward(req, res, INVENTORY_SERVICE_URL);
 });
-// Delete inventory of hero
 inventoryRouter.delete('/:heroId', auth, (req, res) => {
     forward(req, res, INVENTORY_SERVICE_URL);
 });

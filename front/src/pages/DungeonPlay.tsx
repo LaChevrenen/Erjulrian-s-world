@@ -66,7 +66,6 @@ interface UpgradeInfo {
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
 const INVENTORY_API_BASE = import.meta.env.VITE_INVENTORY_BASE || 'http://localhost:3000';
-const POLLING_INTERVAL = 2000;
 
 export default function DungeonPlay(): React.ReactElement {
   const navigate = useNavigate();

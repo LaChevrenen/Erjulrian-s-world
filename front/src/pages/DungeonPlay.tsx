@@ -102,22 +102,26 @@ export default function DungeonPlay(): React.ReactElement {
       const heroResponse = await fetch(`${API_BASE}/api/heroes/${heroId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
-      if (heroResponse.ok) {
-        const heroData = await heroResponse.json();
-        setHeroStats(heroData);
-        setHeroMissing(false);
-        
-        if (heroData.current_hp <= 0) {
-          setChoices([]);
-          setHeroMissing(true);
-          setLoading(false);
-          return;
-        }
-      } else if (heroResponse.status === 404) {
+      if (heroResponse.status === 404) {
         setHeroStats(null);
         setHeroMissing(true);
+            setChoices([]);
+        setInventory(null);
+        setLoading(false);
+        return;
+      }
+      if (!heroResponse.ok) {
+        setError('Erreur lors du chargement du héros');
+        setLoading(false);
+        return;
+      }
+      const heroData = await heroResponse.json();
+      setHeroStats(heroData);
+      setHeroMissing(false);
+      if (heroData.current_hp <= 0) {
         setChoices([]);
+        setHeroMissing(true);
+        setInventory(null);
         setLoading(false);
         return;
       }
@@ -125,49 +129,49 @@ export default function DungeonPlay(): React.ReactElement {
       const choicesResponse = await fetch(`${API_BASE}/api/dungeons/${dungeonId}/choices`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
-      if (choicesResponse.ok) {
-        const data = await choicesResponse.json();
-        setChoices(data.choices || []);
-      } else if (choicesResponse.status === 404) {
-        console.log('Dungeon not found - hero may have died');
+      if (choicesResponse.status === 404) {
         setChoices([]);
         setHeroMissing(true);
         setHeroStats(prev => (prev ? { ...prev, current_hp: 0 } : prev));
+        setInventory(null);
         setLoading(false);
         return;
       }
+      if (!choicesResponse.ok) {
+        setError('Erreur lors du chargement du donjon');
+        setLoading(false);
+        return;
+      }
+      const data = await choicesResponse.json();
+      setChoices(data.choices || []);
 
-      const inventoryResponse = await fetch(`${INVENTORY_API_BASE}/api/inventory/${heroId}`, {
+      let inventoryResponse = await fetch(`${INVENTORY_API_BASE}/api/inventory/${heroId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
-      if (inventoryResponse.ok) {
-        const inventoryData = await inventoryResponse.json();
-        setInventory(inventoryData);
-      } else if (inventoryResponse.status === 404) {
+      if (inventoryResponse.status === 404) {
         const createResponse = await fetch(`${INVENTORY_API_BASE}/api/inventory`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({
-            heroId: heroId,
-            gold: 0
-          })
+          body: JSON.stringify({ heroId, gold: 0 })
         });
-
         if (createResponse.ok) {
           setInventory({ gold: 0, equippedCount: 0, items: [] });
         } else {
-          const errorText = await createResponse.text();
-          console.error('Create inventory failed:', createResponse.status, errorText);
+          setInventory(null);
         }
-      } else {
-        const errorText = await inventoryResponse.text();
-        console.error('Load inventory failed:', inventoryResponse.status, errorText);
+        setLoading(false);
+        return;
       }
+      if (!inventoryResponse.ok) {
+        setError('Erreur lors du chargement de l\'inventaire');
+        setLoading(false);
+        return;
+      }
+      const inventoryData = await inventoryResponse.json();
+      setInventory(inventoryData);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement';
@@ -225,9 +229,8 @@ export default function DungeonPlay(): React.ReactElement {
         throw new Error('Impossible de choisir cette salle');
       }
 
-      const roomIcon = getRoomIcon(choice.type);
       const roomLabel = getRoomLabel(choice.type);
-      addLog(`${roomIcon} ${roomLabel} sélectionnée (Étage ${choice.floor}, Salle ${choice.room})`, 'action', 2000);
+      addLog(`${roomLabel} sélectionnée (Étage ${choice.floor}, Salle ${choice.room})`, 'action', 2000);
 
       if (choice.type.toLowerCase() === 'boss') {
         const result = await response.json();
@@ -329,9 +332,9 @@ export default function DungeonPlay(): React.ReactElement {
         );
         setInventory({ ...inventory, items: updatedItems });
         if (updatedItem.equipped) {
-          addLog(`⚔️ ${getArtifactName(item)} équipé!`, 'action', 2500);
+          addLog(`${getArtifactName(item)} équipé!`, 'action', 2500);
         } else {
-          addLog(`🎒 ${getArtifactName(item)} rangé`, 'action', 2500);
+          addLog(`${getArtifactName(item)} rangé`, 'action', 2500);
         }
       } else {
         const errorText = await response.text();
@@ -405,17 +408,17 @@ export default function DungeonPlay(): React.ReactElement {
   };
 
   const handleUpgradeItem = async (item: Inventory['items'][number]): Promise<void> => {
+
     const heroId = localStorage.getItem('selectedHeroId');
     const token = localStorage.getItem('token');
-    console.error('[DEBUG] handleUpgradeItem:', { heroId, artifactId: item.artifactId, item });
-    const upgradeInfoUrl = `${INVENTORY_API_BASE}/api/inventory/${heroId}/upgrade-info/${item.artifactId}`;
-    console.error('[DEBUG] URL upgrade-info:', upgradeInfoUrl);
-    if (!inventory || !inventory.items.some(i => i.artifactId === item.artifactId)) {
+    if (!inventory || !heroId || !token) {
+      alert('Inventaire ou héros introuvable.');
+      return;
+    }
+    if (!inventory.items.some(i => i.artifactId === item.artifactId)) {
       alert('Cet objet n’est pas présent dans votre inventaire. Impossible de l’améliorer.');
       return;
     }
-
-    if (!heroId || !token) return;
 
     if (!canUpgradeItem(item)) {
       const cost = getUpgradeCost(item);
@@ -468,7 +471,7 @@ export default function DungeonPlay(): React.ReactElement {
         return;
       }
 
-      addLog(`✨ ${getArtifactName(item)} amélioré au niveau ${upgradeInfo.nextLevel}! (-${upgradeInfo.nextUpgradeCost} or)`, 'success', 4000);
+      addLog(`${getArtifactName(item)} amélioré au niveau ${upgradeInfo.nextLevel}! (-${upgradeInfo.nextUpgradeCost} or)`, 'success', 4000);
 
       const inventoryResponse = await fetch(`${INVENTORY_API_BASE}/api/inventory/${heroId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -518,7 +521,7 @@ export default function DungeonPlay(): React.ReactElement {
           i.id === item.id ? updatedItem : i
         ) || [];
         setInventory({ ...inventory!, items: updatedItems });
-        addLog(`🎒 ${getArtifactName(item)} déséquipé`, 'action', 2500);
+        addLog(`${getArtifactName(item)} déséquipé`, 'action', 2500);
       } else {
         const errorText = await response.text();
         console.error('Unequip failed:', response.status, errorText);

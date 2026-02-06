@@ -192,7 +192,6 @@ async function getMonsterWithLoot(monsterId) {
 
 // RabbitMQ publisher setup
 let channel;
-let rpcReplyQueues = {};
 
 async function setupRabbitMQ() {
     try {
@@ -206,61 +205,6 @@ async function setupRabbitMQ() {
         console.error('Failed to connect to RabbitMQ:', error);
         setTimeout(setupRabbitMQ, 5000);
     }
-}
-
-// Retry helper with exponential backoff
-async function retryWithBackoff(fn, maxAttempts = 3) {
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            return await fn();
-        } catch (error) {
-            const isLastAttempt = attempt === maxAttempts;
-            const delayMs = Math.min(100 * Math.pow(2, attempt - 1), 2000);
-            
-            console.error(`[RETRY] Attempt ${attempt}/${maxAttempts} failed:`, error.message);
-            
-            if (isLastAttempt) {
-                console.error(`[RETRY] All ${maxAttempts} attempts failed. Giving up.`);
-                throw error;
-            }
-            
-            console.log(`[RETRY] Waiting ${delayMs}ms before retry...`);
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
-    }
-}
-
-// RPC Call for inter-service communication via RabbitMQ
-async function rpcCall(queue, message, timeoutMs = 5000) {
-    if (!channel) throw new Error('RabbitMQ channel not initialized');
-    
-    const correlationId = Math.random().toString(36).substring(7);
-    const replyQueue = `dungeon.rpc.reply.${correlationId}`;
-    
-    return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-            reject(new Error(`RPC timeout for queue ${queue}`));
-        }, timeoutMs);
-        
-        channel.assertQueue(replyQueue, { exclusive: true, autoDelete: true }).then(() => {
-            channel.consume(replyQueue, (msg) => {
-                if (msg && msg.properties.correlationId === correlationId) {
-                    clearTimeout(timeout);
-                    const response = JSON.parse(msg.content.toString());
-                    channel.ack(msg);
-                    resolve(response);
-                }
-            });
-            
-            channel.assertQueue(queue, { durable: true }).then(() => {
-                channel.sendToQueue(queue, Buffer.from(JSON.stringify(message)), {
-                    persistent: true,
-                    correlationId: correlationId,
-                    replyTo: replyQueue
-                });
-            });
-        }).catch(reject);
-    });
 }
 
 // Helper function to publish events
@@ -359,38 +303,17 @@ async function startCombatResultConsumer() {
 
                     if (isHeroDead) {
                         console.log(`Combat indicates hero death (result: ${combatResult}). Proceeding to cleanup...`);
-                        
                         try {
-                            console.log(`[UPDATE-HP] Updating hero ${heroId} HP to 0 via RabbitMQ...`);
-                            try {
-                                await rpcCall('hero_rpc_queue', {
-                                    type: 'update_hp',
-                                    heroId,
-                                    current_hp: 0
-                                });
-                                console.log(`[UPDATE-HP] Hero HP updated to 0`);
-                            } catch (hpUpdateError) {
-                                console.error(`[UPDATE-HP] Failed to update hero HP:`, hpUpdateError.message);
-                            }
-
-                            console.log(`HERO DIED: Deleting dungeon run ${runId} for hero ${heroId}`);
-                            
-                            // Get dungeon data before deletion for logging
+                            // HERO DIED: Delete dungeon run and log
                             const dungeonForLogging = await DungeonRun.findById(runId);
                             const deleteResult = await DungeonRun.deleteOne({ _id: runId });
                             console.log(`Deletion result:`, deleteResult);
-                            
-                            // Send log for dungeon deletion on hero death
-                            console.log(`[DEBUG] About to call sendLog for dungeon_deleted...`);
                             sendLog(heroId, 'dungeon_deleted', {
                                 runId: runId,
                                 reason: 'hero_died',
                                 floor: dungeonForLogging?.currentFloor || 0,
                                 room: dungeonForLogging?.currentRoom || 0
                             });
-                            console.log(`[DEBUG] sendLog call completed`);
-                            
-                            // Delete hero
                             await publishEvent('hero_queue', {
                                 type: 'delete_hero',
                                 heroId,
@@ -398,7 +321,6 @@ async function startCombatResultConsumer() {
                                 timestamp: new Date()
                             });
                             console.log(`Published hero deletion event for hero ${heroId}`);
-                            
                             await publishEvent('dungeon_queue', {
                                 type: 'dungeon_failed',
                                 runId,
@@ -408,18 +330,6 @@ async function startCombatResultConsumer() {
                             });
                         } catch (error) {
                             console.error('[DEATH-CLEANUP] Failed to cleanup after death:', error.message);
-                        }
-                    } else {
-                        console.log(`[UPDATE-HP] Updating hero ${heroId} HP to ${heroCurrentHp} via RabbitMQ...`);
-                        try {
-                            await rpcCall('hero_rpc_queue', {
-                                type: 'update_hp',
-                                heroId,
-                                current_hp: Math.max(0, heroCurrentHp)
-                            });
-                            console.log(`[UPDATE-HP] Hero HP updated to ${heroCurrentHp}`);
-                        } catch (hpUpdateError) {
-                            console.error(`[UPDATE-HP] Failed to update hero HP:`, hpUpdateError.message);
                         }
                     }
 
@@ -435,12 +345,6 @@ async function startCombatResultConsumer() {
     } catch (error) {
         console.error('Failed to start combat result consumer:', error);
     }
-}
-
-// Helper function to generate random room type
-function getRandomRoomType() {
-    const types = ['combat', 'elite-combat', 'rest', 'boss'];
-    return types[Math.floor(Math.random() * types.length)];
 }
 
 // Helper function to generate dungeon structure (3 floors x 5 rooms)
